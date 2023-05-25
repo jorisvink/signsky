@@ -48,7 +48,7 @@ signsky_platform_alloc_tundev(void)
 	if (len == -1 || (size_t)len >= sizeof(ifr.ifr_name))
 		fatal("signsky.clr interface name too large");
 
-	ifr.ifr_flags = IFF_TUN | IFF_UP;
+	ifr.ifr_flags = IFF_TUN | IFF_UP | IFF_NO_PI;
 
 	if (ioctl(fd, TUNSETIFF, &ifr) == -1)
 		fatal("ioctl: %s", errno_s);
