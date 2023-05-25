@@ -24,6 +24,10 @@
 #include <signal.h>
 #include <unistd.h>
 
+#if defined(__linux__)
+#include <bsd/stdlib.h>
+#endif
+
 #include "signsky.h"
 
 static void	signal_hdlr(int);

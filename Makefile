@@ -32,6 +32,8 @@ OSNAME=$(shell uname -s | sed -e 's/[-_].*//g' | tr A-Z a-z)
 ifeq ("$(OSNAME)", "linux")
 	CFLAGS+=-DPLATFORM_LINUX
 	CFLAGS+=-D_GNU_SOURCE=1 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2
+	SRC+=src/platform_linux.c
+	LDFLAGS+=-lbsd
 else ifeq ("$(OSNAME)", "darwin")
 	CFLAGS+=-DPLATFORM_DARWIN
 	SRC+=src/platform_darwin.c
