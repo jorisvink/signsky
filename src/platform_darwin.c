@@ -23,7 +23,6 @@
 #include <net/if_utun.h>
 
 #include <fcntl.h>
-#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
