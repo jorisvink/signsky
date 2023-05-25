@@ -145,14 +145,16 @@ static void
 crypto_send_packet(int fd, struct signsky_packet *pkt)
 {
 	ssize_t		ret;
+	u_int8_t	*data;
 
 	PRECOND(fd >= 0);
 	PRECOND(pkt != NULL);
 
 	for (;;) {
-		if ((ret = send(fd, pkt->buf, pkt->length, 0)) == -1) {
+		data = signsky_packet_data(pkt);
+		if ((ret = send(fd, data, pkt->length, 0)) == -1) {
 			if (errno == EINTR)
-				continue;
+				break;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				break;
 			fatal("send error: %s", errno_s);
@@ -176,6 +178,7 @@ crypto_recv_packets(int fd)
 	int			idx;
 	ssize_t			ret;
 	struct signsky_packet	*pkt;
+	u_int8_t		*data;
 
 	PRECOND(fd >= 0);
 
@@ -183,10 +186,13 @@ crypto_recv_packets(int fd)
 		if ((pkt = signsky_packet_get()) == NULL)
 			pkt = &tpkt;
 
-		if ((ret = read(fd, pkt->buf, sizeof(pkt->buf))) == -1) {
-			signsky_packet_release(pkt);
+		data = signsky_packet_data(pkt);
+
+		if ((ret = read(fd, data, SIGNSKY_PACKET_DATASZ)) == -1) {
+			if (pkt != &tpkt)
+				signsky_packet_release(pkt);
 			if (errno == EINTR)
-				continue;
+				break;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				break;
 			fatal("read error: %s", errno_s);
@@ -199,6 +205,7 @@ crypto_recv_packets(int fd)
 			continue;
 
 		pkt->length = ret;
+		printf("crypto-rx %p %zd\n", (void *)pkt, pkt->length);
 
 		if (signsky_ring_queue(&signsky->decrypt_queue, pkt) == -1)
 			signsky_packet_release(pkt);

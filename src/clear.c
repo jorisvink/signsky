@@ -97,14 +97,20 @@ static void
 clear_send_packet(int fd, struct signsky_packet *pkt)
 {
 	ssize_t		ret;
+	u_int8_t	*data;
 
 	PRECOND(fd >= 0);
 	PRECOND(pkt != NULL);
 
 	for (;;) {
-		if ((ret = send(fd, pkt->buf, pkt->length, 0)) == -1) {
+		/* XXX, take this from ESP next proto header later */
+		data = signsky_packet_head(pkt);
+		pkt->buf[3] = AF_INET;
+		pkt->length += 4;
+
+		if ((ret = write(fd, data, pkt->length)) == -1) {
 			if (errno == EINTR)
-				continue;
+				break;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				break;
 			fatal("send error: %s", errno_s);
@@ -128,6 +134,7 @@ clear_recv_packets(int fd)
 	int			idx;
 	ssize_t			ret;
 	struct signsky_packet	*pkt;
+	u_int8_t		*data;
 
 	PRECOND(fd >= 0);
 
@@ -135,10 +142,13 @@ clear_recv_packets(int fd)
 		if ((pkt = signsky_packet_get()) == NULL)
 			pkt = &tpkt;
 
-		if ((ret = read(fd, pkt->buf, sizeof(pkt->buf))) == -1) {
-			signsky_packet_release(pkt);
+		data = signsky_packet_data(pkt);
+
+		if ((ret = read(fd, data, SIGNSKY_PACKET_DATASZ)) == -1) {
+			if (pkt != &tpkt)
+				signsky_packet_release(pkt);
 			if (errno == EINTR)
-				continue;
+				break;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				break;
 			fatal("read error: %s", errno_s);

@@ -103,12 +103,19 @@ struct signsky_pool {
 	struct signsky_ring	queue;
 };
 
+/* The available headroom and data size for a packet. */
+#define SIGNSKY_PACKET_HEADSZ		4
+#define SIGNSKY_PACKET_DATASZ		1500
+#define SIGNSKY_PACKET_MAXSZ		\
+    (SIGNSKY_PACKET_HEADSZ + SIGNSKY_PACKET_DATASZ)
+
 /*
  * A network packet that will be encrypted / decrypted.
  */
 struct signsky_packet {
+	size_t		head;
 	size_t		length;
-	u_int8_t	buf[1500];
+	u_int8_t	buf[SIGNSKY_PACKET_MAXSZ];
 };
 
 /*
@@ -145,6 +152,9 @@ struct signsky_proc	*signsky_process(void);
 /* src/packet.c */
 void	signsky_packet_init(void);
 void	signsky_packet_release(struct signsky_packet *);
+
+void	*signsky_packet_head(struct signsky_packet *);
+void	*signsky_packet_data(struct signsky_packet *);
 
 struct signsky_packet	*signsky_packet_get(void);
 

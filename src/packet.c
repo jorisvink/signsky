@@ -48,6 +48,7 @@ signsky_packet_get(void)
 	struct signsky_packet	*pkt;
 
 	pkt = signsky_pool_get(pktpool);
+	pkt->head = 0;
 
 	return (pkt);
 }
@@ -62,4 +63,28 @@ signsky_packet_release(struct signsky_packet *pkt)
 	PRECOND(pkt != NULL);
 
 	signsky_pool_put(pktpool, pkt);
+}
+
+/*
+ * Returns a pointer to the packet headroom.
+ */
+void *
+signsky_packet_head(struct signsky_packet *pkt)
+{
+	PRECOND(pkt != NULL);
+	PRECOND(pkt->head < SIGNSKY_PACKET_MAXSZ);
+
+	return (&pkt->buf[pkt->head]);
+}
+
+/*
+ * Returns a pointer to the packet data.
+ */
+void *
+signsky_packet_data(struct signsky_packet *pkt)
+{
+	PRECOND(pkt != NULL);
+	PRECOND(pkt->head + SIGNSKY_PACKET_HEADSZ < SIGNSKY_PACKET_MAXSZ);
+
+	return (&pkt->buf[pkt->head + SIGNSKY_PACKET_HEADSZ]);
 }
