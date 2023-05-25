@@ -96,9 +96,6 @@ signsky_crypto_entry(struct signsky_proc *proc)
 /*
  * Setup the crypto interface by creating a new socket, binding
  * it locally to the specified port and connecting it to the remote peer.
- *
- * In the future we will swap to sendto() so the connect() won't be
- * needed anymore.
  */
 static int
 crypto_bind_address(void)
@@ -112,18 +109,10 @@ crypto_bind_address(void)
 	memset(&sin, 0, sizeof(sin));
 
 	sin.sin_family = AF_INET;
-	sin.sin_port = htons(signsky->port);
+	sin.sin_addr.s_addr = INADDR_ANY;
+	sin.sin_port = signsky->peer.sin_port;
 
 	if (bind(fd, (struct sockaddr *)&sin, sizeof(sin)) == -1)
-		fatal("%s: connect: %s", __func__, errno_s);
-
-	memset(&sin, 0, sizeof(sin));
-
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(signsky->port);
-	sin.sin_addr.s_addr = inet_addr(signsky->peer);
-
-	if (connect(fd, (struct sockaddr *)&sin, sizeof(sin)) == -1)
 		fatal("%s: connect: %s", __func__, errno_s);
 
 	if (fcntl(fd, F_GETFL, &flags) == -1)
@@ -144,15 +133,18 @@ crypto_bind_address(void)
 static void
 crypto_send_packet(int fd, struct signsky_packet *pkt)
 {
-	ssize_t		ret;
-	u_int8_t	*data;
+	ssize_t			ret;
+	u_int8_t		*data;
 
 	PRECOND(fd >= 0);
 	PRECOND(pkt != NULL);
 
 	for (;;) {
 		data = signsky_packet_data(pkt);
-		if ((ret = send(fd, data, pkt->length, 0)) == -1) {
+
+		if ((ret = sendto(fd, data, pkt->length, 0,
+		    (struct sockaddr *)&signsky->peer,
+		    sizeof(signsky->peer))) == -1) {
 			if (errno == EINTR)
 				break;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
@@ -178,7 +170,9 @@ crypto_recv_packets(int fd)
 	int			idx;
 	ssize_t			ret;
 	struct signsky_packet	*pkt;
+	struct sockaddr_in	peer;
 	u_int8_t		*data;
+	socklen_t		socklen;
 
 	PRECOND(fd >= 0);
 
@@ -186,9 +180,11 @@ crypto_recv_packets(int fd)
 		if ((pkt = signsky_packet_get()) == NULL)
 			pkt = &tpkt;
 
+		socklen = sizeof(peer);
 		data = signsky_packet_data(pkt);
 
-		if ((ret = read(fd, data, SIGNSKY_PACKET_DATASZ)) == -1) {
+		if ((ret = recvfrom(fd, data, SIGNSKY_PACKET_DATASZ, 0,
+		    (struct sockaddr *)&peer, &socklen)) == -1) {
 			if (pkt != &tpkt)
 				signsky_packet_release(pkt);
 			if (errno == EINTR)
@@ -206,6 +202,8 @@ crypto_recv_packets(int fd)
 
 		pkt->length = ret;
 		printf("crypto-rx %p %zd\n", (void *)pkt, pkt->length);
+		printf("  |-> from %s (%u)\n", inet_ntoa(peer.sin_addr),
+		    htons(peer.sin_port));
 
 		if (signsky_ring_queue(&signsky->decrypt_queue, pkt) == -1)
 			signsky_packet_release(pkt);

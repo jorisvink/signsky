@@ -20,6 +20,8 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 
+#include <netinet/in.h>
+
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
@@ -127,8 +129,7 @@ struct signsky_state {
 	struct signsky_ring	decrypt_queue;
 	struct signsky_ring	encrypt_queue;
 
-	int			port;
-	const char		*peer;
+	struct sockaddr_in	peer;
 };
 
 extern struct signsky_state	*signsky;

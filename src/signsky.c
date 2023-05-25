@@ -17,6 +17,8 @@
 #include <sys/types.h>
 #include <sys/shm.h>
 
+#include <arpa/inet.h>
+
 #include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -47,10 +49,12 @@ main(int argc, char *argv[])
 	/* Setup the global state that is shared between all processes. */
 	signsky = signsky_alloc_shared(sizeof(*signsky), NULL);
 
-	signsky->peer = argv[1];
-	signsky->port = strtonum(argv[2], 1, USHRT_MAX, &errstr);
+	signsky->peer.sin_addr.s_addr = inet_addr(argv[1]);
+	signsky->peer.sin_port = strtonum(argv[2], 1, USHRT_MAX, &errstr);
 	if (errstr)
 		fatal("port '%s' invalid: %s", argv[2], errstr);
+
+	signsky->peer.sin_port = htons(signsky->peer.sin_port);
 
 	/* Setup the proc system and initialize the packet pools. */
 	signsky_proc_init();
