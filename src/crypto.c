@@ -120,7 +120,7 @@ crypto_bind_address(void)
 
 	flags |= O_NONBLOCK;
 
-	if (fcntl(fd, F_SETFL, &flags) == -1)
+	if (fcntl(fd, F_SETFL, flags) == -1)
 		fatal("%s: fcntl: %s", __func__, errno_s);
 
 	return (fd);
