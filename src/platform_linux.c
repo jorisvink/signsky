@@ -48,7 +48,7 @@ signsky_platform_tundev_create(void)
 	if (len == -1 || (size_t)len >= sizeof(ifr.ifr_name))
 		fatal("signsky.clr interface name too large");
 
-	ifr.ifr_flags = IFF_TUN | IFF_UP;
+	ifr.ifr_flags = IFF_TUN | IFF_UP | IFF_NO_PI;
 
 	if (ioctl(fd, TUNSETIFF, &ifr) == -1)
 		fatal("ioctl: %s", errno_s);
@@ -62,4 +62,32 @@ signsky_platform_tundev_create(void)
 		fatal("fcntl: %s", errno_s);
 
 	return (fd);
+}
+
+/* Read a single packet from the tunnel device. */
+ssize_t
+signsky_platform_clear_read(int fd, struct signsky_packet *pkt)
+{
+	u_int8_t	*data;
+
+	PRECOND(fd >= 0);
+	PRECOND(pkt != NULL);
+
+	data = signsky_packet_data(pkt);
+
+	return (read(fd, data, SIGNSKY_PACKET_MAX_LEN));
+}
+
+/* Write a single packet to the tunnel device. */
+ssize_t
+signsky_platform_tundev_write(int fd, struct signsky_packet *pkt)
+{
+	u_int8_t		*data;
+
+	PRECOND(fd >= 0);
+	PRECOND(pkt != NULL);
+
+	data = signsky_packet_data(pkt);
+
+	return (write(fd, data, pkt->length));
 }

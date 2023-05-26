@@ -25,6 +25,10 @@
 
 #include "signsky.h"
 
+//static u_int32_t	seqnr = 0;
+
+static void	encrypt_packet_process(struct signsky_packet *);
+
 /*
  * The worker process responsible for encryption of packets coming
  * from the clear side of the tunnel.
@@ -52,10 +56,8 @@ signsky_encrypt_entry(struct signsky_proc *proc)
 			}
 		}
 
-		while ((pkt = signsky_ring_dequeue(&signsky->encrypt_queue))) {
-			printf("%s: encrypt %p\n", proc->name, (void *)pkt);
-			signsky_ring_queue(&signsky->crypto_tx, pkt);
-		}
+		while ((pkt = signsky_ring_dequeue(&signsky->encrypt_queue)))
+			encrypt_packet_process(pkt);
 
 		usleep(10);
 	}
@@ -63,4 +65,22 @@ signsky_encrypt_entry(struct signsky_proc *proc)
 	printf("%s exiting\n", proc->name);
 
 	exit(0);
+}
+
+static void
+encrypt_packet_process(struct signsky_packet *pkt)
+{
+//	struct signsky_esphdr		*esp;
+
+	PRECOND(pkt != NULL);
+	PRECOND(pkt->target == SIGNSKY_PROC_ENCRYPT);
+
+//	esp = signsky_packet_start(pkt);
+
+//	esp->seq = seqnr++;
+//	esp->spi = 0xdeadbabe;
+
+//	pkt->length += sizeof(*esp);
+
+	signsky_ring_queue(&signsky->crypto_tx, pkt);
 }

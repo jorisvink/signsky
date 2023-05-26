@@ -122,22 +122,7 @@ struct signsky_esptrail {
 } __attribute__((packed));
 
 /*
- * Tunnel device packet information size that is in front of each
- * packet read from a tunnel device, even on Linux (we do not set
- * the IFF_NO_PI flag). This happens to be half size of the ESP
- * header structure, so happy times.
- */
-#define SIGNSKY_PACKET_INFO_LEN		4
-
-#if defined(__linux__)
-#define SIGNSKY_PACKET_PROTO_IP4	ETH_P_IP
-#else
-#define SIGNSKY_PACKET_PROTO_IP4	AF_INET
-#endif
-
-/*
- * The available head room is the entire size of an ESP header,
- * which also fits the packet information for cleartext interfaces.
+ * The available head room is the entire size of an ESP header.
  */
 #define SIGNSKY_PACKET_HEAD_LEN		sizeof(struct signsky_esphdr)
 #define SIGNSKY_PACKET_DATA_LEN		1500
@@ -152,7 +137,7 @@ struct signsky_esptrail {
  */
 struct signsky_packet {
 	size_t		length;
-	u_int32_t	protocol;
+	u_int32_t	target;
 	u_int8_t	buf[SIGNSKY_PACKET_MAX_LEN];
 };
 
@@ -216,7 +201,8 @@ void	*signsky_alloc_shared(size_t, int *);
 
 /* platform bits. */
 int	signsky_platform_tundev_create(void);
-int	signsky_platform_tundev_read(int, struct signsky_packet *);
+ssize_t	signsky_platform_tundev_read(int, struct signsky_packet *);
+ssize_t	signsky_platform_tundev_write(int, struct signsky_packet *);
 
 /* Worker entry points. */
 void	signsky_clear_entry(struct signsky_proc *) __attribute__((noreturn));

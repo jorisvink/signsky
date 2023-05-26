@@ -26,16 +26,6 @@
  * The clear and crypto io processes will for each received packet grab
  * one from the pool and hand them over to either the encryption or decryption
  * processes who in turn hand them over to the crypto or clear io processes.
- *
- * Packets have some headroom and then the packet data. When reading from
- * the cleartext interfaces this includes 4 bytes to allow for the
- * protocol to be placed there by the kernel. The headroom is large
- * enough to fit the ESP header and the packet information.
- *
- *    8 bytes       pkt->length
- * +----------+--------------------+
- * | headroom |    packet data     |
- * +----------+--------------------+
  */
 struct signsky_pool	*pktpool;
 
@@ -60,7 +50,7 @@ signsky_packet_get(void)
 	pkt = signsky_pool_get(pktpool);
 
 	pkt->length = 0;
-	pkt->protocol = 0;
+	pkt->target = 0;
 
 	return (pkt);
 }
@@ -78,7 +68,7 @@ signsky_packet_release(struct signsky_packet *pkt)
 }
 
 /*
- * Returns a pointer to the packet start.
+ * Returns a pointer to the packet start (the location of the ESP header).
  */
 void *
 signsky_packet_start(struct signsky_packet *pkt)
@@ -89,18 +79,7 @@ signsky_packet_start(struct signsky_packet *pkt)
 }
 
 /*
- * Returns a pointer to the packet information.
- */
-void *
-signsky_packet_info(struct signsky_packet *pkt)
-{
-	PRECOND(pkt != NULL);
-
-	return (&pkt->buf[SIGNSKY_PACKET_INFO_LEN]);
-}
-
-/*
- * Returns a pointer to the packet data.
+ * Returns a pointer to the packet data (immediately after the ESP header).
  */
 void *
 signsky_packet_data(struct signsky_packet *pkt)

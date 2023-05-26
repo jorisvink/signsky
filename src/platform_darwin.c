@@ -19,6 +19,7 @@
 #include <sys/kern_control.h>
 #include <sys/socket.h>
 #include <sys/sys_domain.h>
+#include <sys/uio.h>
 
 #include <net/if_utun.h>
 
@@ -73,4 +74,56 @@ signsky_platform_tundev_create(void)
 		fatal("fcntl: %s", errno_s);
 
 	return (fd);
+}
+
+/*
+ * Read a packet from the tunnel device. On MacOS this is prefixed
+ * with the protocol (4 bytes), so split up the read into two
+ * parts: the protocol and the actual packet data.
+ */
+ssize_t
+signsky_platform_tundev_read(int fd, struct signsky_packet *pkt)
+{
+	u_int8_t		*data;
+	struct iovec		iov[2];
+	u_int32_t		protocol;
+
+	PRECOND(fd >= 0);
+	PRECOND(pkt != NULL);
+
+	data = signsky_packet_data(pkt);
+
+	iov[0].iov_base = &protocol;
+	iov[0].iov_len = sizeof(protocol);
+	iov[1].iov_base = data;
+	iov[1].iov_len = SIGNSKY_PACKET_MAX_LEN;
+
+	return (readv(fd, iov, 2));
+}
+
+/*
+ * Write a packet to the tunnel device. We must prefix it with the
+ * correct protocol in network byte order.
+ */
+ssize_t
+signsky_platform_tundev_write(int fd, struct signsky_packet *pkt)
+{
+	u_int32_t		proto;
+	u_int8_t		*data;
+	struct iovec		iov[2];
+
+	PRECOND(fd >= 0);
+	PRECOND(pkt != NULL);
+
+	data = signsky_packet_data(pkt);
+
+	/* XXX, take this from ESP next proto header later */
+	proto = htonl(AF_INET);
+
+	iov[0].iov_base = &proto;
+	iov[0].iov_len = sizeof(proto);
+	iov[1].iov_base = data;
+	iov[1].iov_len = pkt->length;
+
+	return (writev(fd, iov, 2));
 }

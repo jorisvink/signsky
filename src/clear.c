@@ -97,21 +97,12 @@ static void
 clear_send_packet(int fd, struct signsky_packet *pkt)
 {
 	ssize_t		ret;
-	u_int8_t	*data;
 
 	PRECOND(fd >= 0);
 	PRECOND(pkt != NULL);
 
 	for (;;) {
-		/* XXX, take this from ESP next proto header later */
-		data = signsky_packet_info(pkt);
-
-		data[0] = 0x0;
-		data[1] = 0x0;
-		data[2] = SIGNSKY_PACKET_PROTO_IP4 >> 8;
-		data[3] = SIGNSKY_PACKET_PROTO_IP4 & 0xff;
-
-		if ((ret = write(fd, data, pkt->length + 4)) == -1) {
+		if ((ret = signsky_platform_tundev_write(fd, pkt)) == -1) {
 			if (errno == EINTR)
 				break;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
@@ -134,10 +125,9 @@ clear_send_packet(int fd, struct signsky_packet *pkt)
 static void
 clear_recv_packets(int fd)
 {
-	int			idx;
-	ssize_t			ret;
-	struct signsky_packet	*pkt;
-	u_int8_t		*data;
+	int				idx;
+	ssize_t				ret;
+	struct signsky_packet		*pkt;
 
 	PRECOND(fd >= 0);
 
@@ -145,15 +135,7 @@ clear_recv_packets(int fd)
 		if ((pkt = signsky_packet_get()) == NULL)
 			pkt = &tpkt;
 
-		/*
-		 * When reading from a tunnel device we have 4 bytes of
-		 * extra information at the start from the kernel which
-		 * informs us about the protocol.
-		 */
-		data = signsky_packet_info(pkt);
-
-		if ((ret = read(fd, data,
-		    SIGNSKY_PACKET_INFO_LEN + SIGNSKY_PACKET_MAX_LEN)) == -1) {
+		if ((ret = signsky_platform_tundev_read(fd, pkt)) == -1) {
 			if (pkt != &tpkt)
 				signsky_packet_release(pkt);
 			if (errno == EINTR)
@@ -175,11 +157,8 @@ clear_recv_packets(int fd)
 		if (pkt == &tpkt)
 			continue;
 
-		/* Store the protocol for later. */
-		memcpy(&pkt->protocol, data, sizeof(pkt->protocol));
-
-		/* Remove the packet information (see above). */
-		pkt->length = ret - SIGNSKY_PACKET_INFO_LEN;
+		pkt->length = ret;
+		pkt->target = SIGNSKY_PROC_ENCRYPT;
 
 		if (signsky_ring_queue(&signsky->encrypt_queue, pkt) == -1)
 			signsky_packet_release(pkt);
