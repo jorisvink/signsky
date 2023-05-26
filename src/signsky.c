@@ -33,28 +33,47 @@
 #include "signsky.h"
 
 static void	signal_hdlr(int);
+static void	signsky_parse_peer(char *);
+
+static void	usage(void) __attribute__((noreturn));
 
 volatile sig_atomic_t		sig_recv = -1;
 struct signsky_state		*signsky = NULL;
 
+static void
+usage(void)
+{
+	fprintf(stderr, "signsky [options]\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "options:\n");
+	fprintf(stderr, "  -p  specify the peer ip and port (ip:port)\n");
+	exit(1);
+}
+
 int
 main(int argc, char *argv[])
 {
-	const char	*errstr;
-	int		running, sig;
+	char		*peer;
+	int		ch, running, sig;
 
-	if (argc != 3)
-		fatal("Usage: signsky [peer] [port]");
+	peer = NULL;
+
+	while ((ch = getopt(argc, argv, "p:")) != -1) {
+		switch (ch) {
+		case 'p':
+			peer = optarg;
+			break;
+		default:
+			usage();
+		}
+	}
+
+	if (peer == NULL)
+		usage();
 
 	/* Setup the global state that is shared between all processes. */
 	signsky = signsky_alloc_shared(sizeof(*signsky), NULL);
-
-	signsky->peer.sin_addr.s_addr = inet_addr(argv[1]);
-	signsky->peer.sin_port = strtonum(argv[2], 1, USHRT_MAX, &errstr);
-	if (errstr)
-		fatal("port '%s' invalid: %s", argv[2], errstr);
-
-	signsky->peer.sin_port = htons(signsky->peer.sin_port);
+	signsky_parse_peer(peer);
 
 	/* Setup the proc system and initialize the packet pools. */
 	signsky_proc_init();
@@ -186,6 +205,31 @@ fatal(const char *fmt, ...)
 	fprintf(stderr, "\n");
 
 	exit(1);
+}
+
+/*
+ * Helper to parse the specified peer into the global state.
+ */
+static void
+signsky_parse_peer(char *peer)
+{
+	char		*port;
+	const char	*errstr;
+
+	PRECOND(peer != NULL);
+
+	if ((port = strchr(peer, ':')) == NULL)
+		fatal("-p argument must be in format ip:port");
+	*(port)++ = '\0';
+
+	if (inet_pton(AF_INET, peer, &signsky->peer.sin_addr.s_addr) == -1)
+		fatal("peer ip '%s' invalid", peer);
+
+	signsky->peer.sin_port = strtonum(port, 1, USHRT_MAX, &errstr);
+	if (errstr)
+		fatal("port '%s' invalid: %s", port, errstr);
+
+	signsky->peer.sin_port = htons(signsky->peer.sin_port);
 }
 
 /*
