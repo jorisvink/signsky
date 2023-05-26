@@ -34,7 +34,7 @@
  * XXX - permissions on tunnel device.
  */
 int
-signsky_platform_alloc_tundev(void)
+signsky_platform_tundev_create(void)
 {
 	struct ifreq	ifr;
 	int		len, fd, flags;
@@ -48,7 +48,7 @@ signsky_platform_alloc_tundev(void)
 	if (len == -1 || (size_t)len >= sizeof(ifr.ifr_name))
 		fatal("signsky.clr interface name too large");
 
-	ifr.ifr_flags = IFF_TUN | IFF_UP | IFF_NO_PI;
+	ifr.ifr_flags = IFF_TUN | IFF_UP;
 
 	if (ioctl(fd, TUNSETIFF, &ifr) == -1)
 		fatal("ioctl: %s", errno_s);

@@ -31,7 +31,7 @@
 static void	clear_recv_packets(int);
 static void	clear_send_packet(int, struct signsky_packet *);
 
-/* Temporary packet for when the packet buffer is empty. */
+/* Temporary packet for when the packet pool is empty. */
 static struct signsky_packet	tpkt;
 
 /*
@@ -50,7 +50,7 @@ signsky_clear_entry(struct signsky_proc *proc)
 	signsky_signal_trap(SIGQUIT);
 	signsky_signal_ignore(SIGINT);
 
-	fd = signsky_platform_alloc_tundev();
+	fd = signsky_platform_tundev_create();
 
 	pfd.fd = fd;
 	pfd.events = POLLIN;
@@ -105,15 +105,18 @@ clear_send_packet(int fd, struct signsky_packet *pkt)
 	for (;;) {
 		/* XXX, take this from ESP next proto header later */
 		data = signsky_packet_head(pkt);
-		pkt->buf[3] = AF_INET;
-		pkt->length += 4;
 
-		if ((ret = write(fd, data, pkt->length)) == -1) {
+		pkt->buf[0] = 0x0;
+		pkt->buf[1] = 0x0;
+		pkt->buf[2] = 0x0;
+		pkt->buf[3] = SIGNSKY_PACKET_PROTO_IP4;
+
+		if ((ret = write(fd, data, pkt->length + 4)) == -1) {
 			if (errno == EINTR)
 				break;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				break;
-			fatal("send error: %s", errno_s);
+			fatal("%s: write(): %s", __func__, errno_s);
 		}
 
 		break;
@@ -142,25 +145,38 @@ clear_recv_packets(int fd)
 		if ((pkt = signsky_packet_get()) == NULL)
 			pkt = &tpkt;
 
-		data = signsky_packet_data(pkt);
+		/*
+		 * Tunnel devices add a protocol information field in the
+		 * first 4 bytes in front of the packet. This is why we
+		 * read in the data immediately at signsky_packet_head()
+		 * so the headroom is actually the packet information.
+		 */
+		data = signsky_packet_head(pkt);
 
-		if ((ret = read(fd, data, SIGNSKY_PACKET_DATASZ)) == -1) {
+		if ((ret = read(fd, data, SIGNSKY_PACKET_MAX_LEN)) == -1) {
 			if (pkt != &tpkt)
 				signsky_packet_release(pkt);
 			if (errno == EINTR)
 				break;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				break;
-			fatal("read error: %s", errno_s);
+			fatal("%s: read(): %s", __func__, errno_s);
 		}
 
 		if (ret == 0)
 			fatal("eof on tunnel interface");
 
+		if (ret <= SIGNSKY_PACKET_MIN_LEN) {
+			if (pkt != &tpkt)
+				signsky_packet_release(pkt);
+			continue;
+		}
+
 		if (pkt == &tpkt)
 			continue;
 
-		pkt->length = ret;
+		/* Remove the packet information (see above). */
+		pkt->length = ret - SIGNSKY_PACKET_INFO_LEN;
 
 		if (signsky_ring_queue(&signsky->encrypt_queue, pkt) == -1)
 			signsky_packet_release(pkt);

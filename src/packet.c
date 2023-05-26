@@ -26,6 +26,15 @@
  * The clear and crypto io processes will for each received packet grab
  * one from the pool and hand them over to either the encryption or decryption
  * processes who in turn hand them over to the crypto or clear io processes.
+ *
+ * Packets have some headroom and then the packet data. When reading from
+ * the cleartext interfaces this headroom is 4 bytes to allow for the
+ * protocol to be placed there by the kernel.
+ *
+ *   4 bytes        pkt->length
+ * +----------+---------------------+
+ * | protocol |     packet data     |
+ * +----------+---------------------+
  */
 struct signsky_pool	*pktpool;
 
@@ -72,7 +81,7 @@ void *
 signsky_packet_head(struct signsky_packet *pkt)
 {
 	PRECOND(pkt != NULL);
-	PRECOND(pkt->head < SIGNSKY_PACKET_MAXSZ);
+	PRECOND(pkt->head < SIGNSKY_PACKET_MAX_LEN);
 
 	return (&pkt->buf[pkt->head]);
 }
@@ -84,7 +93,7 @@ void *
 signsky_packet_data(struct signsky_packet *pkt)
 {
 	PRECOND(pkt != NULL);
-	PRECOND(pkt->head + SIGNSKY_PACKET_HEADSZ < SIGNSKY_PACKET_MAXSZ);
+	PRECOND(pkt->head + SIGNSKY_PACKET_HEAD_LEN < SIGNSKY_PACKET_MAX_LEN);
 
-	return (&pkt->buf[pkt->head + SIGNSKY_PACKET_HEADSZ]);
+	return (&pkt->buf[pkt->head + SIGNSKY_PACKET_HEAD_LEN]);
 }

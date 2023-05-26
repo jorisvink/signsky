@@ -36,7 +36,7 @@ static void	crypto_recv_packets(int);
 static int	crypto_bind_address(void);
 static void	crypto_send_packet(int, struct signsky_packet *);
 
-/* Temporary packet for when the packet buffer is empty. */
+/* Temporary packet for when the packet pool is empty. */
 static struct signsky_packet	tpkt;
 
 /*
@@ -149,7 +149,7 @@ crypto_send_packet(int fd, struct signsky_packet *pkt)
 				break;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				break;
-			fatal("send error: %s", errno_s);
+			fatal("sendto: %s", errno_s);
 		}
 
 		break;
@@ -183,7 +183,7 @@ crypto_recv_packets(int fd)
 		socklen = sizeof(peer);
 		data = signsky_packet_data(pkt);
 
-		if ((ret = recvfrom(fd, data, SIGNSKY_PACKET_DATASZ, 0,
+		if ((ret = recvfrom(fd, data, SIGNSKY_PACKET_DATA_LEN, 0,
 		    (struct sockaddr *)&peer, &socklen)) == -1) {
 			if (pkt != &tpkt)
 				signsky_packet_release(pkt);

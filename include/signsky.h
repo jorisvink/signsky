@@ -105,11 +105,27 @@ struct signsky_pool {
 	struct signsky_ring	queue;
 };
 
+/*
+ * Tunnel device packet information size that is in front of each
+ * packet read from a tunnel device, even on Linux (we do not set
+ * the IFF_NO_PI flag).
+ */
+#define SIGNSKY_PACKET_INFO_LEN		4
+
+#if defined(__linux__)
+#define SIGNSKY_PACKET_PROTO_IP4	0x08
+#else
+#define SIGNSKY_PACKET_PROTO_IP4	AF_INET
+#endif
+
 /* The available headroom and data size for a packet. */
-#define SIGNSKY_PACKET_HEADSZ		4
-#define SIGNSKY_PACKET_DATASZ		1500
-#define SIGNSKY_PACKET_MAXSZ		\
-    (SIGNSKY_PACKET_HEADSZ + SIGNSKY_PACKET_DATASZ)
+#define SIGNSKY_PACKET_HEAD_LEN		SIGNSKY_PACKET_INFO_LEN
+#define SIGNSKY_PACKET_DATA_LEN		1500
+#define SIGNSKY_PACKET_MAX_LEN		\
+    (SIGNSKY_PACKET_HEAD_LEN + SIGNSKY_PACKET_DATA_LEN)
+
+/* The minimum size we can read from an interface. */
+#define SIGNSKY_PACKET_MIN_LEN		12
 
 /*
  * A network packet that will be encrypted / decrypted.
@@ -117,7 +133,7 @@ struct signsky_pool {
 struct signsky_packet {
 	size_t		head;
 	size_t		length;
-	u_int8_t	buf[SIGNSKY_PACKET_MAXSZ];
+	u_int8_t	buf[SIGNSKY_PACKET_MAX_LEN];
 };
 
 /*
@@ -178,7 +194,8 @@ struct signsky_ring	*signsky_ring_alloc(size_t);
 void	*signsky_alloc_shared(size_t, int *);
 
 /* platform bits. */
-int	signsky_platform_alloc_tundev(void);
+int	signsky_platform_tundev_create(void);
+int	signsky_platform_tundev_read(int, struct signsky_packet *);
 
 /* Worker entry points. */
 void	signsky_clear_entry(struct signsky_proc *) __attribute__((noreturn));

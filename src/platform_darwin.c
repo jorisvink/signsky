@@ -37,7 +37,7 @@
  * Creates utun99 on the host and returns a socket for it.
  */
 int
-signsky_platform_alloc_tundev(void)
+signsky_platform_tundev_create(void)
 {
 	struct sockaddr_ctl	sctl;
 	struct ctl_info		info;
