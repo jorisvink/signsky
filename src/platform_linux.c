@@ -66,7 +66,7 @@ signsky_platform_tundev_create(void)
 
 /* Read a single packet from the tunnel device. */
 ssize_t
-signsky_platform_clear_read(int fd, struct signsky_packet *pkt)
+signsky_platform_tundev_read(int fd, struct signsky_packet *pkt)
 {
 	u_int8_t	*data;
 
