@@ -108,8 +108,8 @@ clear_send_packet(int fd, struct signsky_packet *pkt)
 
 		pkt->buf[0] = 0x0;
 		pkt->buf[1] = 0x0;
-		pkt->buf[2] = 0x0;
-		pkt->buf[3] = SIGNSKY_PACKET_PROTO_IP4;
+		pkt->buf[2] = SIGNSKY_PACKET_PROTO_IP4 >> 8;
+		pkt->buf[3] = SIGNSKY_PACKET_PROTO_IP4 & 0xff;
 
 		if ((ret = write(fd, data, pkt->length + 4)) == -1) {
 			if (errno == EINTR)

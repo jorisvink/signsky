@@ -22,6 +22,10 @@
 
 #include <netinet/in.h>
 
+#if defined(__linux__)
+#include <linux/if_ether.h>
+#endif
+
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
@@ -113,7 +117,7 @@ struct signsky_pool {
 #define SIGNSKY_PACKET_INFO_LEN		4
 
 #if defined(__linux__)
-#define SIGNSKY_PACKET_PROTO_IP4	0x08
+#define SIGNSKY_PACKET_PROTO_IP4	ETH_P_IP
 #else
 #define SIGNSKY_PACKET_PROTO_IP4	AF_INET
 #endif
