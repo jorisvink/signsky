@@ -109,10 +109,23 @@ struct signsky_pool {
 	struct signsky_ring	queue;
 };
 
+/* The ESP header. */
+struct signsky_esphdr {
+	u_int32_t		spi;
+	u_int32_t		seq;
+} __attribute__((packed));
+
+/* The ESP trailer. */
+struct signsky_esptrail {
+	u_int8_t		pad;
+	u_int8_t		next;
+} __attribute__((packed));
+
 /*
  * Tunnel device packet information size that is in front of each
  * packet read from a tunnel device, even on Linux (we do not set
- * the IFF_NO_PI flag).
+ * the IFF_NO_PI flag). This happens to be half size of the ESP
+ * header structure, so happy times.
  */
 #define SIGNSKY_PACKET_INFO_LEN		4
 
@@ -122,8 +135,11 @@ struct signsky_pool {
 #define SIGNSKY_PACKET_PROTO_IP4	AF_INET
 #endif
 
-/* The available headroom and data size for a packet. */
-#define SIGNSKY_PACKET_HEAD_LEN		SIGNSKY_PACKET_INFO_LEN
+/*
+ * The available head room is the entire size of an ESP header,
+ * which also fits the packet information for cleartext interfaces.
+ */
+#define SIGNSKY_PACKET_HEAD_LEN		sizeof(struct signsky_esphdr)
 #define SIGNSKY_PACKET_DATA_LEN		1500
 #define SIGNSKY_PACKET_MAX_LEN		\
     (SIGNSKY_PACKET_HEAD_LEN + SIGNSKY_PACKET_DATA_LEN)
@@ -135,8 +151,8 @@ struct signsky_pool {
  * A network packet that will be encrypted / decrypted.
  */
 struct signsky_packet {
-	size_t		head;
 	size_t		length;
+	u_int32_t	protocol;
 	u_int8_t	buf[SIGNSKY_PACKET_MAX_LEN];
 };
 
@@ -174,8 +190,9 @@ struct signsky_proc	*signsky_process(void);
 void	signsky_packet_init(void);
 void	signsky_packet_release(struct signsky_packet *);
 
-void	*signsky_packet_head(struct signsky_packet *);
+void	*signsky_packet_info(struct signsky_packet *);
 void	*signsky_packet_data(struct signsky_packet *);
+void	*signsky_packet_start(struct signsky_packet *);
 
 struct signsky_packet	*signsky_packet_get(void);
 

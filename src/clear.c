@@ -104,12 +104,12 @@ clear_send_packet(int fd, struct signsky_packet *pkt)
 
 	for (;;) {
 		/* XXX, take this from ESP next proto header later */
-		data = signsky_packet_head(pkt);
+		data = signsky_packet_info(pkt);
 
-		pkt->buf[0] = 0x0;
-		pkt->buf[1] = 0x0;
-		pkt->buf[2] = SIGNSKY_PACKET_PROTO_IP4 >> 8;
-		pkt->buf[3] = SIGNSKY_PACKET_PROTO_IP4 & 0xff;
+		data[0] = 0x0;
+		data[1] = 0x0;
+		data[2] = SIGNSKY_PACKET_PROTO_IP4 >> 8;
+		data[3] = SIGNSKY_PACKET_PROTO_IP4 & 0xff;
 
 		if ((ret = write(fd, data, pkt->length + 4)) == -1) {
 			if (errno == EINTR)
@@ -146,14 +146,14 @@ clear_recv_packets(int fd)
 			pkt = &tpkt;
 
 		/*
-		 * Tunnel devices add a protocol information field in the
-		 * first 4 bytes in front of the packet. This is why we
-		 * read in the data immediately at signsky_packet_head()
-		 * so the headroom is actually the packet information.
+		 * When reading from a tunnel device we have 4 bytes of
+		 * extra information at the start from the kernel which
+		 * informs us about the protocol.
 		 */
-		data = signsky_packet_head(pkt);
+		data = signsky_packet_info(pkt);
 
-		if ((ret = read(fd, data, SIGNSKY_PACKET_MAX_LEN)) == -1) {
+		if ((ret = read(fd, data,
+		    SIGNSKY_PACKET_INFO_LEN + SIGNSKY_PACKET_MAX_LEN)) == -1) {
 			if (pkt != &tpkt)
 				signsky_packet_release(pkt);
 			if (errno == EINTR)
@@ -174,6 +174,9 @@ clear_recv_packets(int fd)
 
 		if (pkt == &tpkt)
 			continue;
+
+		/* Store the protocol for later. */
+		memcpy(&pkt->protocol, data, sizeof(pkt->protocol));
 
 		/* Remove the packet information (see above). */
 		pkt->length = ret - SIGNSKY_PACKET_INFO_LEN;

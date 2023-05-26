@@ -28,13 +28,14 @@
  * processes who in turn hand them over to the crypto or clear io processes.
  *
  * Packets have some headroom and then the packet data. When reading from
- * the cleartext interfaces this headroom is 4 bytes to allow for the
- * protocol to be placed there by the kernel.
+ * the cleartext interfaces this includes 4 bytes to allow for the
+ * protocol to be placed there by the kernel. The headroom is large
+ * enough to fit the ESP header and the packet information.
  *
- *   4 bytes        pkt->length
- * +----------+---------------------+
- * | protocol |     packet data     |
- * +----------+---------------------+
+ *    8 bytes       pkt->length
+ * +----------+--------------------+
+ * | headroom |    packet data     |
+ * +----------+--------------------+
  */
 struct signsky_pool	*pktpool;
 
@@ -57,7 +58,9 @@ signsky_packet_get(void)
 	struct signsky_packet	*pkt;
 
 	pkt = signsky_pool_get(pktpool);
-	pkt->head = 0;
+
+	pkt->length = 0;
+	pkt->protocol = 0;
 
 	return (pkt);
 }
@@ -75,15 +78,25 @@ signsky_packet_release(struct signsky_packet *pkt)
 }
 
 /*
- * Returns a pointer to the packet headroom.
+ * Returns a pointer to the packet start.
  */
 void *
-signsky_packet_head(struct signsky_packet *pkt)
+signsky_packet_start(struct signsky_packet *pkt)
 {
 	PRECOND(pkt != NULL);
-	PRECOND(pkt->head < SIGNSKY_PACKET_MAX_LEN);
 
-	return (&pkt->buf[pkt->head]);
+	return (&pkt->buf[0]);
+}
+
+/*
+ * Returns a pointer to the packet information.
+ */
+void *
+signsky_packet_info(struct signsky_packet *pkt)
+{
+	PRECOND(pkt != NULL);
+
+	return (&pkt->buf[SIGNSKY_PACKET_INFO_LEN]);
 }
 
 /*
@@ -93,7 +106,7 @@ void *
 signsky_packet_data(struct signsky_packet *pkt)
 {
 	PRECOND(pkt != NULL);
-	PRECOND(pkt->head + SIGNSKY_PACKET_HEAD_LEN < SIGNSKY_PACKET_MAX_LEN);
+	PRECOND(pkt->length <= SIGNSKY_PACKET_DATA_LEN);
 
-	return (&pkt->buf[pkt->head + SIGNSKY_PACKET_HEAD_LEN]);
+	return (&pkt->buf[SIGNSKY_PACKET_HEAD_LEN]);
 }
