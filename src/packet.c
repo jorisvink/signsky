@@ -47,7 +47,8 @@ signsky_packet_get(void)
 {
 	struct signsky_packet	*pkt;
 
-	pkt = signsky_pool_get(pktpool);
+	if ((pkt = signsky_pool_get(pktpool)) == NULL)
+		return (NULL);
 
 	pkt->length = 0;
 	pkt->target = 0;
