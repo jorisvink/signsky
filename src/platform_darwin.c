@@ -35,14 +35,14 @@
 
 /*
  * MacOS tunnel interface creation.
- * Creates utun99 on the host and returns a socket for it.
+ * Attempts to create a tunnel device, anywhere from utun99 until utun104.
  */
 int
 signsky_platform_tundev_create(void)
 {
 	struct sockaddr_ctl	sctl;
 	struct ctl_info		info;
-	int			fd, flags;
+	int			idx, fd, flags;
 
 	memset(&info, 0, sizeof(info));
 	memset(&sctl, 0, sizeof(sctl));
@@ -57,13 +57,23 @@ signsky_platform_tundev_create(void)
 	if (ioctl(fd, CTLIOCGINFO, &info) == -1)
 		fatal("ioctl: %s", errno_s);
 
-	sctl.sc_unit = 100;
-	sctl.sc_id = info.ctl_id;
-	sctl.sc_family = AF_SYSTEM;
-	sctl.ss_sysaddr = AF_SYS_CONTROL;
+	for (idx = 100; idx < 105; idx++) {
+		sctl.sc_unit = idx;
+		sctl.sc_id = info.ctl_id;
+		sctl.sc_family = AF_SYSTEM;
+		sctl.ss_sysaddr = AF_SYS_CONTROL;
 
-	if (connect(fd, (struct sockaddr *)&sctl, sizeof(sctl)) == -1)
-		fatal("connect: %s", errno_s);
+		if (connect(fd, (struct sockaddr *)&sctl, sizeof(sctl)) == -1) {
+			if (errno == EBUSY)
+				continue;
+			fatal("connect: %s", errno_s);
+		}
+
+		break;
+	}
+
+	if (idx == 105)
+		fatal("no free utun device found");
 
 	if ((flags = fcntl(fd, F_GETFL, 0)) == -1)
 		fatal("fcntl: %s", errno_s);
@@ -84,6 +94,7 @@ signsky_platform_tundev_create(void)
 ssize_t
 signsky_platform_tundev_read(int fd, struct signsky_packet *pkt)
 {
+	ssize_t			ret;
 	u_int8_t		*data;
 	struct iovec		iov[2];
 	u_int32_t		protocol;
@@ -98,7 +109,16 @@ signsky_platform_tundev_read(int fd, struct signsky_packet *pkt)
 	iov[1].iov_base = data;
 	iov[1].iov_len = SIGNSKY_PACKET_MAX_LEN;
 
-	return (readv(fd, iov, 2));
+	/*
+	 * We have to adjust the total data read with the protocol
+	 * information we read, otherwise the size makes no sense
+	 * later for our other components.
+	 */
+	ret = readv(fd, iov, 2);
+	if (ret != -1 && (size_t)ret >= sizeof(protocol))
+		ret -= sizeof(protocol);
+
+	return (ret);
 }
 
 /*
