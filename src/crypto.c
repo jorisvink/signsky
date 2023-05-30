@@ -111,7 +111,7 @@ crypto_bind_address(void)
 	    sizeof(signsky->local)) == -1)
 		fatal("%s: connect: %s", __func__, errno_s);
 
-	if (fcntl(fd, F_GETFL, &flags) == -1)
+	if ((flags = fcntl(fd, F_GETFL, 0)) == -1)
 		fatal("%s: fcntl: %s", __func__, errno_s);
 
 	flags |= O_NONBLOCK;
