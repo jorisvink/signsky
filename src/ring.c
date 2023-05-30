@@ -27,7 +27,7 @@
  * we are in a spinloop hopefully avoiding a memory order violation
  * which would incur a performance hit.
  */
-#if defined(__arm64__)
+#if defined(__arm64__) || defined(__aarch64__)
 #define ring_cpu_pause()					\
 	do {							\
 		__asm__ volatile("yield" ::: "memory");		\
