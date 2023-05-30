@@ -33,7 +33,7 @@
 #include "signsky.h"
 
 static void	signal_hdlr(int);
-static void	signsky_parse_peer(char *);
+static void	signsky_parse_host(char *, struct sockaddr_in *);
 
 static void	usage(void) __attribute__((noreturn));
 
@@ -46,6 +46,7 @@ usage(void)
 	fprintf(stderr, "signsky [options]\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "options:\n");
+	fprintf(stderr, "  -l  specify the local ip and port (ip:port)\n");
 	fprintf(stderr, "  -p  specify the peer ip and port (ip:port)\n");
 	exit(1);
 }
@@ -53,13 +54,17 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
-	char		*peer;
+	char		*peer, *local;
 	int		ch, running, sig;
 
 	peer = NULL;
+	local = NULL;
 
-	while ((ch = getopt(argc, argv, "p:")) != -1) {
+	while ((ch = getopt(argc, argv, "l:p:")) != -1) {
 		switch (ch) {
+		case 'l':
+			local = optarg;
+			break;
 		case 'p':
 			peer = optarg;
 			break;
@@ -73,7 +78,10 @@ main(int argc, char *argv[])
 
 	/* Setup the global state that is shared between all processes. */
 	signsky = signsky_alloc_shared(sizeof(*signsky), NULL);
-	signsky_parse_peer(peer);
+	signsky_parse_host(peer, &signsky->peer);
+
+	if (local != NULL)
+		signsky_parse_host(local, &signsky->local);
 
 	/* Setup the proc system and initialize the packet pools. */
 	signsky_proc_init();
@@ -208,28 +216,29 @@ fatal(const char *fmt, ...)
 }
 
 /*
- * Helper to parse the specified peer into the global state.
+ * Helper to parse the specified ip:port combo into the given sockaddr.
  */
 static void
-signsky_parse_peer(char *peer)
+signsky_parse_host(char *host, struct sockaddr_in *sin)
 {
 	char		*port;
 	const char	*errstr;
 
-	PRECOND(peer != NULL);
+	PRECOND(host != NULL);
+	PRECOND(sin != NULL);
 
-	if ((port = strchr(peer, ':')) == NULL)
-		fatal("-p argument must be in format ip:port");
+	if ((port = strchr(host, ':')) == NULL)
+		fatal("'%s': argument must be in format ip:port", host);
 	*(port)++ = '\0';
 
-	if (inet_pton(AF_INET, peer, &signsky->peer.sin_addr.s_addr) == -1)
-		fatal("peer ip '%s' invalid", peer);
+	if (inet_pton(AF_INET, host, &sin->sin_addr.s_addr) == -1)
+		fatal("ip '%s' invalid", host);
 
-	signsky->peer.sin_port = strtonum(port, 1, USHRT_MAX, &errstr);
+	sin->sin_port = strtonum(port, 1, USHRT_MAX, &errstr);
 	if (errstr)
 		fatal("port '%s' invalid: %s", port, errstr);
 
-	signsky->peer.sin_port = htons(signsky->peer.sin_port);
+	sin->sin_port = htons(sin->sin_port);
 }
 
 /*

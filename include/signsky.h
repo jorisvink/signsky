@@ -151,6 +151,7 @@ struct signsky_state {
 	struct signsky_ring	encrypt_queue;
 
 	struct sockaddr_in	peer;
+	struct sockaddr_in	local;
 };
 
 extern struct signsky_state	*signsky;

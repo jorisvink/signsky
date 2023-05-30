@@ -100,19 +100,15 @@ signsky_crypto_entry(struct signsky_proc *proc)
 static int
 crypto_bind_address(void)
 {
-	struct sockaddr_in	sin;
-	int			fd, flags;
+	int		fd, flags;
 
 	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		fatal("%s: socket: %s", __func__, errno_s);
 
-	memset(&sin, 0, sizeof(sin));
+	signsky->local.sin_family = AF_INET;
 
-	sin.sin_family = AF_INET;
-	sin.sin_addr.s_addr = INADDR_ANY;
-	sin.sin_port = signsky->peer.sin_port;
-
-	if (bind(fd, (struct sockaddr *)&sin, sizeof(sin)) == -1)
+	if (bind(fd, (struct sockaddr *)&signsky->local,
+	    sizeof(signsky->local)) == -1)
 		fatal("%s: connect: %s", __func__, errno_s);
 
 	if (fcntl(fd, F_GETFL, &flags) == -1)
