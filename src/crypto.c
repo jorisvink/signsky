@@ -151,8 +151,6 @@ crypto_send_packet(int fd, struct signsky_packet *pkt)
 		break;
 	}
 
-	printf("crypto-tx %p (%zd/%zu)\n", (void *)pkt, ret, pkt->length);
-
 	signsky_packet_release(pkt);
 }
 
@@ -197,9 +195,6 @@ crypto_recv_packets(int fd)
 			continue;
 
 		pkt->length = ret;
-		printf("crypto-rx %p %zd\n", (void *)pkt, pkt->length);
-		printf("  |-> from %s (%u)\n", inet_ntoa(peer.sin_addr),
-		    htons(peer.sin_port));
 
 		if (signsky_ring_queue(&signsky->decrypt_queue, pkt) == -1)
 			signsky_packet_release(pkt);

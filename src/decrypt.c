@@ -53,7 +53,6 @@ signsky_decrypt_entry(struct signsky_proc *proc)
 		}
 
 		while ((pkt = signsky_ring_dequeue(&signsky->decrypt_queue))) {
-			printf("%s: decrypt %p\n", proc->name, (void *)pkt);
 			signsky_ring_queue(&signsky->clear_tx, pkt);
 		}
 

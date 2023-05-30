@@ -113,8 +113,6 @@ clear_send_packet(int fd, struct signsky_packet *pkt)
 		break;
 	}
 
-	printf("clear-tx %p (%zd/%zu)\n", (void *)pkt, ret, pkt->length);
-
 	signsky_packet_release(pkt);
 }
 
