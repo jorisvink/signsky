@@ -32,12 +32,16 @@
 /* The number of packets in a single run we try to read. */
 #define PACKETS_PER_EVENT		32
 
+static void	crypto_drop_access(void);
 static void	crypto_recv_packets(int);
 static int	crypto_bind_address(void);
 static void	crypto_send_packet(int, struct signsky_packet *);
 
 /* Temporary packet for when the packet pool is empty. */
 static struct signsky_packet	tpkt;
+
+/* The local queues. */
+static struct signsky_proc_io	*io = NULL;
 
 /*
  * The process responsible for receiving packets on the crypto side
@@ -51,6 +55,10 @@ signsky_crypto_entry(struct signsky_proc *proc)
 	int				fd, sig, running;
 
 	PRECOND(proc != NULL);
+	PRECOND(proc->arg != NULL);
+
+	io = proc->arg;
+	crypto_drop_access();
 
 	signsky_signal_trap(SIGQUIT);
 	signsky_signal_ignore(SIGINT);
@@ -82,7 +90,7 @@ signsky_crypto_entry(struct signsky_proc *proc)
 		if (pfd.revents & POLLIN)
 			crypto_recv_packets(fd);
 
-		while ((pkt = signsky_ring_dequeue(&signsky->crypto_tx)))
+		while ((pkt = signsky_ring_dequeue(io->crypto)))
 			crypto_send_packet(fd, pkt);
 
 		usleep(10);
@@ -91,6 +99,25 @@ signsky_crypto_entry(struct signsky_proc *proc)
 	printf("ifc-crypto exiting\n");
 
 	exit(0);
+}
+
+/*
+ * Drop access to the queues and fds it does not need.
+ */
+static void
+crypto_drop_access(void)
+{
+	signsky_shm_detach(io->tx);
+	signsky_shm_detach(io->rx[0]);
+	signsky_shm_detach(io->rx[1]);
+	signsky_shm_detach(io->clear);
+	signsky_shm_detach(io->encrypt);
+
+	io->tx = NULL;
+	io->rx[0] = NULL;
+	io->rx[1] = NULL;
+	io->clear = NULL;
+	io->encrypt = NULL;
 }
 
 /*
@@ -196,7 +223,7 @@ crypto_recv_packets(int fd)
 
 		pkt->length = ret;
 
-		if (signsky_ring_queue(&signsky->decrypt_queue, pkt) == -1)
+		if (signsky_ring_queue(io->decrypt, pkt) == -1)
 			signsky_packet_release(pkt);
 	}
 }

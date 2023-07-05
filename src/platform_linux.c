@@ -75,7 +75,7 @@ signsky_platform_tundev_read(int fd, struct signsky_packet *pkt)
 
 	data = signsky_packet_data(pkt);
 
-	return (read(fd, data, SIGNSKY_PACKET_MAX_LEN));
+	return (read(fd, data, SIGNSKY_PACKET_DATA_LEN));
 }
 
 /* Write a single packet to the tunnel device. */

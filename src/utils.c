@@ -50,3 +50,15 @@ signsky_alloc_shared(size_t len, int *key)
 
 	return (ptr);
 }
+
+/*
+ * Detach from a shared memory segment.
+ */
+void
+signsky_shm_detach(void *ptr)
+{
+	PRECOND(ptr != NULL);
+
+	if (shmdt(ptr) == -1)
+		fatal("failed to detach from 0x%p (%s)", ptr, errno_s);
+}

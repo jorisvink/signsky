@@ -25,6 +25,11 @@
 
 #include "signsky.h"
 
+static void	decrypt_drop_access(void);
+
+/* The local queues. */
+static struct signsky_proc_io	*io = NULL;
+
 /*
  * The worker process responsible for encryption of packets coming
  * from the clear side of the tunnel.
@@ -36,6 +41,10 @@ signsky_decrypt_entry(struct signsky_proc *proc)
 	int				sig, running;
 
 	PRECOND(proc != NULL);
+	PRECOND(proc->arg != NULL);
+
+	io = proc->arg;
+	decrypt_drop_access();
 
 	signsky_signal_trap(SIGQUIT);
 	signsky_signal_ignore(SIGINT);
@@ -52,8 +61,8 @@ signsky_decrypt_entry(struct signsky_proc *proc)
 			}
 		}
 
-		while ((pkt = signsky_ring_dequeue(&signsky->decrypt_queue))) {
-			signsky_ring_queue(&signsky->clear_tx, pkt);
+		while ((pkt = signsky_ring_dequeue(io->decrypt))) {
+			signsky_ring_queue(io->clear, pkt);
 		}
 
 		usleep(10);
@@ -62,4 +71,16 @@ signsky_decrypt_entry(struct signsky_proc *proc)
 	printf("%s exiting\n", proc->name);
 
 	exit(0);
+}
+
+static void
+decrypt_drop_access(void)
+{
+	signsky_shm_detach(io->tx);
+	signsky_shm_detach(io->crypto);
+	signsky_shm_detach(io->encrypt);
+
+	io->tx = NULL;
+	io->crypto = NULL;
+	io->encrypt = NULL;
 }

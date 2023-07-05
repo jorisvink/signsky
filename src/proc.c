@@ -15,6 +15,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/shm.h>
 #include <sys/wait.h>
 
 #include <stdio.h>
@@ -34,7 +35,8 @@ static const char *proctab[] = {
 	"clear",
 	"crypto",
 	"encrypt",
-	"decrypt"
+	"decrypt",
+	"keying"
 };
 
 /* Points to the process its own signsky_proc, or NULL or parent. */
@@ -50,55 +52,79 @@ signsky_proc_init(void)
 }
 
 /*
+ * Start the clear and crypto sides.
+ *
+ * We create all the shared memory queues and pass them to each process.
+ * The processes themselves will remove the queues they do not need.
+ */
+void
+signsky_proc_start(void)
+{
+	struct signsky_proc_io		io;
+
+	io.tx = signsky_alloc_shared(sizeof(struct signsky_sa), NULL);
+	io.rx[0] = signsky_alloc_shared(sizeof(struct signsky_sa), NULL);
+	io.rx[1] = signsky_alloc_shared(sizeof(struct signsky_sa), NULL);
+
+	io.clear = signsky_ring_alloc(1024);
+	io.crypto = signsky_ring_alloc(1024);
+	io.encrypt = signsky_ring_alloc(1024);
+	io.decrypt = signsky_ring_alloc(1024);
+
+	signsky_proc_create(SIGNSKY_PROC_CLEAR, signsky_clear_entry, &io);
+	signsky_proc_create(SIGNSKY_PROC_CRYPTO, signsky_crypto_entry, &io);
+	signsky_proc_create(SIGNSKY_PROC_KEYING, signsky_keying_entry, &io);
+	signsky_proc_create(SIGNSKY_PROC_ENCRYPT, signsky_encrypt_entry, &io);
+	signsky_proc_create(SIGNSKY_PROC_DECRYPT, signsky_decrypt_entry, &io);
+
+	signsky_shm_detach(io.tx);
+	signsky_shm_detach(io.rx[0]);
+	signsky_shm_detach(io.rx[1]);
+	signsky_shm_detach(io.clear);
+	signsky_shm_detach(io.crypto);
+	signsky_shm_detach(io.encrypt);
+	signsky_shm_detach(io.decrypt);
+}
+
+/*
  * Create a new process that will start executing at the given entry
  * point. The process is not yet started.
  */
 void
-signsky_proc_create(u_int16_t type, void (*entry)(struct signsky_proc *))
+signsky_proc_create(u_int16_t type,
+    void (*entry)(struct signsky_proc *), void *arg)
 {
 	struct signsky_proc	*proc;
 
 	PRECOND(type == SIGNSKY_PROC_CLEAR ||
 	    type == SIGNSKY_PROC_CRYPTO ||
 	    type == SIGNSKY_PROC_ENCRYPT ||
-	    type == SIGNSKY_PROC_DECRYPT );
+	    type == SIGNSKY_PROC_DECRYPT ||
+	    type == SIGNSKY_PROC_KEYING);
 	PRECOND(entry != NULL);
+	/* arg is optional. */
 
 	if ((proc = calloc(1, sizeof(*proc))) == NULL)
 		fatal("calloc: failed to allocate new proc entry");
 
-	proc->pid = -1;
+	proc->arg = arg;
 	proc->type = type;
 	proc->entry = entry;
 	proc->name = proctab[type];
 
-	LIST_INSERT_HEAD(&proclist, proc, list);
-}
+	if ((proc->pid = fork()) == -1)
+		fatal("failed to fork child: %s", errno_s);
 
-/*
- * Start all previously created processes in one go. If creation of
- * one process fails, everything already running is killed and we go byebye.
- */
-void
-signsky_proc_startall(void)
-{
-	struct signsky_proc	*proc;
-
-	LIST_FOREACH(proc, &proclist, list) {
-		VERIFY(proc->pid == -1);
-
-		if ((proc->pid = fork()) == -1)
-			fatal("failed to fork child: %s", errno_s);
-
-		if (proc->pid == 0) {
-			process = proc;
-			proc->pid = getpid(),
-			proc->entry(proc);
-			/* NOTREACHED */
-		}
-
-		printf("proc-%s, pid=%d\n", proc->name, proc->pid);
+	if (proc->pid == 0) {
+		process = proc;
+		proc->pid = getpid(),
+		proc->entry(proc);
+		/* NOTREACHED */
 	}
+
+	printf("proc-%s started (%d)\n", proc->name, proc->pid);
+
+	LIST_INSERT_HEAD(&proclist, proc, list);
 }
 
 /*

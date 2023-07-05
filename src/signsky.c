@@ -46,6 +46,8 @@ usage(void)
 	fprintf(stderr, "signsky [options]\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "options:\n");
+	fprintf(stderr,
+	    "  -k  specify the file containing the 256-bit symmetrical key\n");
 	fprintf(stderr, "  -l  specify the local ip and port (ip:port)\n");
 	fprintf(stderr, "  -p  specify the peer ip and port (ip:port)\n");
 	exit(1);
@@ -54,14 +56,19 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
+	const char	*key;
 	char		*peer, *local;
 	int		ch, running, sig;
 
+	key = NULL;
 	peer = NULL;
 	local = NULL;
 
-	while ((ch = getopt(argc, argv, "l:p:")) != -1) {
+	while ((ch = getopt(argc, argv, "k:l:p:")) != -1) {
 		switch (ch) {
+		case 'k':
+			key = optarg;
+			break;
 		case 'l':
 			local = optarg;
 			break;
@@ -73,52 +80,22 @@ main(int argc, char *argv[])
 		}
 	}
 
-	if (peer == NULL)
+	if (peer == NULL || key == NULL)
 		usage();
 
-	/* Setup the global state that is shared between all processes. */
 	signsky = signsky_alloc_shared(sizeof(*signsky), NULL);
 	signsky_parse_host(peer, &signsky->peer);
 
 	if (local != NULL)
 		signsky_parse_host(local, &signsky->local);
 
-	/* Setup the proc system and initialize the packet pools. */
-	signsky_proc_init();
-	signsky_packet_init();
-
-	/*
-	 * We allocate the shared ring queues before firing off the
-	 * processes so they all share them automatically.
-	 */
-	signsky_ring_init(&signsky->clear_tx, 1024);
-	signsky_ring_init(&signsky->crypto_tx, 1024);
-	signsky_ring_init(&signsky->decrypt_queue, 1024);
-	signsky_ring_init(&signsky->encrypt_queue, 1024);
-
-	/*
-	 * Prepare the 4 processes in signsky:
-	 *	- 1 process handling io on the clear side.
-	 *	- 1 process handling io on the crypto side.
-	 *	- 1 process handling encryption only.
-	 *	- 1 process handling decryption only.
-	 */
-	signsky_proc_create(SIGNSKY_PROC_CLEAR, signsky_clear_entry);
-	signsky_proc_create(SIGNSKY_PROC_CRYPTO, signsky_crypto_entry);
-
-	signsky_proc_create(SIGNSKY_PROC_ENCRYPT, signsky_encrypt_entry);
-	signsky_proc_create(SIGNSKY_PROC_DECRYPT, signsky_decrypt_entry);
-
-	signsky_proc_startall();
-
-	/* Detach from the state, we no longer need it mapped in our parent. */
-	if (shmdt(signsky) == -1)
-		printf("warning: failed to detach from state\n");
-
-	/* XXX SIGCHLD needs to be done before starting procs, fix. */
 	signsky_signal_trap(SIGINT);
 	signsky_signal_trap(SIGHUP);
 	signsky_signal_trap(SIGCHLD);
+
+	signsky_proc_init();
+	signsky_packet_init();
+	signsky_proc_start();
 
 	running = 1;
 

@@ -64,12 +64,25 @@
 		}							\
 	} while (0)
 
+#define SIGNSKY_KEY_LENGTH		32
+
 /* Process types */
 #define SIGNSKY_PROC_CLEAR		1
 #define SIGNSKY_PROC_CRYPTO		2
 #define SIGNSKY_PROC_ENCRYPT		3
 #define SIGNSKY_PROC_DECRYPT		4
-#define SIGNSKY_PROC_MAX		5
+#define SIGNSKY_PROC_KEYING		5
+#define SIGNSKY_PROC_MAX		6
+
+/*
+ * A security association complete with SPI, current sequence number
+ * and key.
+ */
+struct signsky_sa {
+	u_int32_t		spi;
+	u_int64_t		seqnr;
+	u_int8_t		key[SIGNSKY_KEY_LENGTH];
+};
 
 /*
  * A process under the control of the parent process.
@@ -77,10 +90,26 @@
 struct signsky_proc {
 	pid_t			pid;
 	u_int16_t		type;
+	void			*arg;
 	const char		*name;
 	void			(*entry)(struct signsky_proc *);
 
 	LIST_ENTRY(signsky_proc)	list;
+};
+
+/*
+ * Used to pass all the queues to the clear and crypto sides.
+ * Each process is responsible for removing the queues they
+ * do not need themselves.
+ */
+struct signsky_proc_io {
+	struct signsky_sa	*tx;
+	struct signsky_sa	*rx[2];
+
+	struct signsky_ring	*clear;
+	struct signsky_ring	*crypto;
+	struct signsky_ring	*encrypt;
+	struct signsky_ring	*decrypt;
 };
 
 /*
@@ -109,22 +138,28 @@ struct signsky_pool {
 	struct signsky_ring	queue;
 };
 
-/* The ESP header. */
-struct signsky_esphdr {
-	u_int32_t		spi;
-	u_int32_t		seq;
+/*
+ * An encrypted packet its head, includes the ESP header *and* the
+ * 64-bit packet number used as part of the nonce later.
+ */
+struct signsky_ipsec_hdr {
+	struct {
+		u_int32_t		spi;
+		u_int32_t		seq;
+	} esp;
+	u_int64_t		pn;
 } __attribute__((packed));
 
-/* The ESP trailer. */
+/* ESP trailer, added to the plaintext before encrypted. */
 struct signsky_esptrail {
 	u_int8_t		pad;
 	u_int8_t		next;
 } __attribute__((packed));
 
 /*
- * The available head room is the entire size of an ESP header.
+ * The available head room is the entire size of an signsky_ipsec_hdr.
  */
-#define SIGNSKY_PACKET_HEAD_LEN		sizeof(struct signsky_esphdr)
+#define SIGNSKY_PACKET_HEAD_LEN		sizeof(struct signsky_ipsec_hdr)
 #define SIGNSKY_PACKET_DATA_LEN		1500
 #define SIGNSKY_PACKET_MAX_LEN		\
     (SIGNSKY_PACKET_HEAD_LEN + SIGNSKY_PACKET_DATA_LEN)
@@ -133,7 +168,7 @@ struct signsky_esptrail {
 #define SIGNSKY_PACKET_MIN_LEN		12
 
 /*
- * A network packet that will be encrypted / decrypted.
+ * A network packet.
  */
 struct signsky_packet {
 	size_t		length;
@@ -145,11 +180,7 @@ struct signsky_packet {
  * The shared state between processes.
  */
 struct signsky_state {
-	struct signsky_ring	clear_tx;
-	struct signsky_ring	crypto_tx;
-	struct signsky_ring	decrypt_queue;
-	struct signsky_ring	encrypt_queue;
-
+	/* Local and remote addresses. */
 	struct sockaddr_in	peer;
 	struct sockaddr_in	local;
 };
@@ -165,10 +196,11 @@ void	fatal(const char *, ...) __attribute__((format (printf, 1, 2)));
 /* src/proc. */
 void	signsky_proc_init(void);
 void	signsky_proc_reap(void);
+void	signsky_proc_start(void);
 void	signsky_proc_killall(int);
 void	signsky_proc_shutdown(void);
-void	signsky_proc_startall(void);
-void	signsky_proc_create(u_int16_t, void (*entry)(struct signsky_proc *));
+void	signsky_proc_create(u_int16_t,
+	    void (*entry)(struct signsky_proc *), void *);
 
 struct signsky_proc	*signsky_process(void);
 
@@ -198,6 +230,7 @@ int	signsky_ring_queue(struct signsky_ring *, void *);
 struct signsky_ring	*signsky_ring_alloc(size_t);
 
 /* src/utils.c */
+void	signsky_shm_detach(void *);
 void	*signsky_alloc_shared(size_t, int *);
 
 /* platform bits. */
@@ -207,6 +240,7 @@ ssize_t	signsky_platform_tundev_write(int, struct signsky_packet *);
 
 /* Worker entry points. */
 void	signsky_clear_entry(struct signsky_proc *) __attribute__((noreturn));
+void	signsky_keying_entry(struct signsky_proc *) __attribute__((noreturn));
 void	signsky_crypto_entry(struct signsky_proc *) __attribute__((noreturn));
 void	signsky_decrypt_entry(struct signsky_proc *) __attribute__((noreturn));
 void	signsky_encrypt_entry(struct signsky_proc *) __attribute__((noreturn));

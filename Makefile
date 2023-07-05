@@ -16,6 +16,7 @@ SRC=	src/signsky.c \
 	src/clear.c \
 	src/decrypt.c \
 	src/encrypt.c \
+	src/keying.c \
 	src/proc.c \
 	src/packet.c \
 	src/pool.c \

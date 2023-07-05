@@ -28,11 +28,15 @@
 /* The number of packets in a single run we try to read. */
 #define PACKETS_PER_EVENT		32
 
+static void	clear_drop_access(void);
 static void	clear_recv_packets(int);
 static void	clear_send_packet(int, struct signsky_packet *);
 
 /* Temporary packet for when the packet pool is empty. */
 static struct signsky_packet	tpkt;
+
+/* The local queues. */
+static struct signsky_proc_io	*io = NULL;
 
 /*
  * The process responsible for receiving packets on the clear side
@@ -46,12 +50,15 @@ signsky_clear_entry(struct signsky_proc *proc)
 	int				fd, sig, running;
 
 	PRECOND(proc != NULL);
+	PRECOND(proc->arg != NULL);
+
+	io = proc->arg;
+	clear_drop_access();
 
 	signsky_signal_trap(SIGQUIT);
 	signsky_signal_ignore(SIGINT);
 
 	fd = signsky_platform_tundev_create();
-
 	pfd.fd = fd;
 	pfd.events = POLLIN;
 
@@ -76,7 +83,7 @@ signsky_clear_entry(struct signsky_proc *proc)
 		if (pfd.revents & POLLIN)
 			clear_recv_packets(fd);
 
-		while ((pkt = signsky_ring_dequeue(&signsky->clear_tx)))
+		while ((pkt = signsky_ring_dequeue(io->clear)))
 			clear_send_packet(fd, pkt);
 
 		usleep(10);
@@ -87,6 +94,25 @@ signsky_clear_entry(struct signsky_proc *proc)
 	printf("%s exiting\n", proc->name);
 
 	exit(0);
+}
+
+/*
+ * Drop access to the queues and fds it does not need.
+ */
+static void
+clear_drop_access(void)
+{
+	signsky_shm_detach(io->tx);
+	signsky_shm_detach(io->rx[0]);
+	signsky_shm_detach(io->rx[1]);
+	signsky_shm_detach(io->crypto);
+	signsky_shm_detach(io->decrypt);
+
+	io->tx = NULL;
+	io->rx[0] = NULL;
+	io->rx[1] = NULL;
+	io->crypto = NULL;
+	io->decrypt = NULL;
 }
 
 /*
@@ -158,7 +184,7 @@ clear_recv_packets(int fd)
 		pkt->length = ret;
 		pkt->target = SIGNSKY_PROC_ENCRYPT;
 
-		if (signsky_ring_queue(&signsky->encrypt_queue, pkt) == -1)
+		if (signsky_ring_queue(io->encrypt, pkt) == -1)
 			signsky_packet_release(pkt);
 	}
 }

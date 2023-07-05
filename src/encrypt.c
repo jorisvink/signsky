@@ -25,9 +25,14 @@
 
 #include "signsky.h"
 
-//static u_int32_t	seqnr = 0;
-
+static void	encrypt_drop_access(void);
 static void	encrypt_packet_process(struct signsky_packet *);
+
+/* The current TX sa. */
+static struct signsky_sa	sa_tx;
+
+/* The local queues. */
+static struct signsky_proc_io	*io = NULL;
 
 /*
  * The worker process responsible for encryption of packets coming
@@ -40,11 +45,16 @@ signsky_encrypt_entry(struct signsky_proc *proc)
 	int			sig, running;
 
 	PRECOND(proc != NULL);
+	PRECOND(proc->arg != NULL);
+
+	io = proc->arg;
+	encrypt_drop_access();
 
 	signsky_signal_trap(SIGQUIT);
 	signsky_signal_ignore(SIGINT);
 
 	running = 1;
+	memset(&sa_tx, 0, sizeof(sa_tx));
 
 	while (running) {
 		if ((sig = signsky_last_signal()) != -1) {
@@ -56,7 +66,7 @@ signsky_encrypt_entry(struct signsky_proc *proc)
 			}
 		}
 
-		while ((pkt = signsky_ring_dequeue(&signsky->encrypt_queue)))
+		while ((pkt = signsky_ring_dequeue(io->encrypt)))
 			encrypt_packet_process(pkt);
 
 		usleep(10);
@@ -68,19 +78,35 @@ signsky_encrypt_entry(struct signsky_proc *proc)
 }
 
 static void
+encrypt_drop_access(void)
+{
+	signsky_shm_detach(io->rx[0]);
+	signsky_shm_detach(io->rx[1]);
+	signsky_shm_detach(io->clear);
+	signsky_shm_detach(io->decrypt);
+
+	io->rx[0] = NULL;
+	io->rx[1] = NULL;
+	io->clear = NULL;
+	io->decrypt = NULL;
+}
+
+static void
 encrypt_packet_process(struct signsky_packet *pkt)
 {
-//	struct signsky_esphdr		*esp;
+	struct signsky_ipsec_hdr	*hdr;
 
 	PRECOND(pkt != NULL);
 	PRECOND(pkt->target == SIGNSKY_PROC_ENCRYPT);
 
-//	esp = signsky_packet_start(pkt);
+	hdr = signsky_packet_start(pkt);
 
-//	esp->seq = seqnr++;
-//	esp->spi = 0xdeadbabe;
+	hdr->pn = sa_tx.seqnr++;
+
+	hdr->esp.spi = sa_tx.spi;
+	hdr->esp.seq = hdr->pn & 0xffffffff;
 
 //	pkt->length += sizeof(*esp);
 
-	signsky_ring_queue(&signsky->crypto_tx, pkt);
+	signsky_ring_queue(io->crypto, pkt);
 }
