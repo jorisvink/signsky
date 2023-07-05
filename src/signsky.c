@@ -46,8 +46,7 @@ usage(void)
 	fprintf(stderr, "signsky [options]\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "options:\n");
-	fprintf(stderr,
-	    "  -k  specify the file containing the 256-bit symmetrical key\n");
+	fprintf(stderr, "  -k  specify the file with a 256-bit key\n");
 	fprintf(stderr, "  -l  specify the local ip and port (ip:port)\n");
 	fprintf(stderr, "  -p  specify the peer ip and port (ip:port)\n");
 	exit(1);
