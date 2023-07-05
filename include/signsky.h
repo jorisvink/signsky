@@ -17,6 +17,10 @@
 #ifndef __H_SIGNSKY_H
 #define __H_SIGNSKY_H
 
+#if defined(__APPLE__)
+#define daemon portability_is_king
+#endif
+
 #include <sys/types.h>
 #include <sys/queue.h>
 
@@ -28,8 +32,14 @@
 
 #include <errno.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+
+#if defined(__APPLE__)
+#undef daemon
+extern int daemon(int, int);
+#endif
 
 /* A few handy macros. */
 #define errno_s		strerror(errno)

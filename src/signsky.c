@@ -19,7 +19,6 @@
 
 #include <stdarg.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
 
@@ -40,6 +39,7 @@ usage(void)
 	fprintf(stderr, "\n");
 	fprintf(stderr, "options:\n");
 	fprintf(stderr, "  -c  The configuration file.\n");
+	fprintf(stderr, "  -d  Daemonize the parent process.\n");
 	exit(1);
 }
 
@@ -47,14 +47,18 @@ int
 main(int argc, char *argv[])
 {
 	const char	*config;
-	int		ch, running, sig;
+	int		ch, running, sig, foreground;
 
 	config = NULL;
+	foreground = 1;
 
-	while ((ch = getopt(argc, argv, "c:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:d")) != -1) {
 		switch (ch) {
 		case 'c':
 			config = optarg;
+			break;
+		case 'd':
+			foreground = 0;
 			break;
 		default:
 			usage();
@@ -70,15 +74,23 @@ main(int argc, char *argv[])
 	signsky_signal_trap(SIGINT);
 	signsky_signal_trap(SIGHUP);
 	signsky_signal_trap(SIGCHLD);
+	signsky_signal_trap(SIGQUIT);
 
 	signsky_proc_init();
 	signsky_packet_init();
 	signsky_proc_start();
 
 	early = 0;
+
+	if (foreground == 0) {
+		if (daemon(1, 0) == -1)
+			fatal("daemon: %s", errno_s);
+	}
+
 	openlog("signsky", LOG_NDELAY | LOG_PID, LOG_DAEMON);
 
 	running = 1;
+	syslog(LOG_INFO, "signsky started");
 
 	while (running) {
 		if ((sig = signsky_last_signal()) != -1) {
@@ -86,6 +98,7 @@ main(int argc, char *argv[])
 			switch (sig) {
 			case SIGINT:
 			case SIGHUP:
+			case SIGQUIT:
 				running = 0;
 				continue;
 			case SIGCHLD:
