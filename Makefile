@@ -12,6 +12,7 @@ CFLAGS+=-fstack-protector-all -Wtype-limits -fno-common -Iinclude
 CFLAGS+=-g
 
 SRC=	src/signsky.c \
+	src/config.c \
 	src/crypto.c \
 	src/clear.c \
 	src/decrypt.c \

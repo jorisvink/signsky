@@ -63,10 +63,11 @@ signsky_clear_entry(struct signsky_proc *proc)
 	pfd.events = POLLIN;
 
 	running = 1;
+	signsky_proc_privsep(proc);
 
 	while (running) {
 		if ((sig = signsky_last_signal()) != -1) {
-			printf("%s received signal %d\n", proc->name, sig);
+			syslog(LOG_NOTICE, "received signal %d", sig);
 			switch (sig) {
 			case SIGQUIT:
 				running = 0;
@@ -91,7 +92,7 @@ signsky_clear_entry(struct signsky_proc *proc)
 
 	close(fd);
 
-	printf("%s exiting\n", proc->name);
+	syslog(LOG_NOTICE, "exiting");
 
 	exit(0);
 }

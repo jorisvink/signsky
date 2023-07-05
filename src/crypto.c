@@ -70,10 +70,11 @@ signsky_crypto_entry(struct signsky_proc *proc)
 	pfd.events = POLLIN;
 
 	running = 1;
+	signsky_proc_privsep(proc);
 
 	while (running) {
 		if ((sig = signsky_last_signal()) != -1) {
-			printf("ifc-crypto received signal %d\n", sig);
+			syslog(LOG_NOTICE, "received signal %d", sig);
 			switch (sig) {
 			case SIGQUIT:
 				running = 0;
@@ -96,7 +97,7 @@ signsky_crypto_entry(struct signsky_proc *proc)
 		usleep(10);
 	}
 
-	printf("ifc-crypto exiting\n");
+	syslog(LOG_NOTICE, "exiting");
 
 	exit(0);
 }

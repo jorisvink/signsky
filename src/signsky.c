@@ -17,26 +17,19 @@
 #include <sys/types.h>
 #include <sys/shm.h>
 
-#include <arpa/inet.h>
-
-#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
 
-#if defined(__linux__)
-#include <bsd/stdlib.h>
-#endif
-
 #include "signsky.h"
 
 static void	signal_hdlr(int);
-static void	signsky_parse_host(char *, struct sockaddr_in *);
 
 static void	usage(void) __attribute__((noreturn));
 
+static int			early = 1;
 volatile sig_atomic_t		sig_recv = -1;
 struct signsky_state		*signsky = NULL;
 
@@ -46,47 +39,33 @@ usage(void)
 	fprintf(stderr, "signsky [options]\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "options:\n");
-	fprintf(stderr, "  -k  specify the file with a 256-bit key\n");
-	fprintf(stderr, "  -l  specify the local ip and port (ip:port)\n");
-	fprintf(stderr, "  -p  specify the peer ip and port (ip:port)\n");
+	fprintf(stderr, "  -c  The configuration file.\n");
 	exit(1);
 }
 
 int
 main(int argc, char *argv[])
 {
-	const char	*key;
-	char		*peer, *local;
+	const char	*config;
 	int		ch, running, sig;
 
-	key = NULL;
-	peer = NULL;
-	local = NULL;
+	config = NULL;
 
-	while ((ch = getopt(argc, argv, "k:l:p:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:")) != -1) {
 		switch (ch) {
-		case 'k':
-			key = optarg;
-			break;
-		case 'l':
-			local = optarg;
-			break;
-		case 'p':
-			peer = optarg;
+		case 'c':
+			config = optarg;
 			break;
 		default:
 			usage();
 		}
 	}
 
-	if (peer == NULL || key == NULL)
+	if (config == NULL)
 		usage();
 
 	signsky = signsky_alloc_shared(sizeof(*signsky), NULL);
-	signsky_parse_host(peer, &signsky->peer);
-
-	if (local != NULL)
-		signsky_parse_host(local, &signsky->local);
+	signsky_config_load(config);
 
 	signsky_signal_trap(SIGINT);
 	signsky_signal_trap(SIGHUP);
@@ -96,11 +75,14 @@ main(int argc, char *argv[])
 	signsky_packet_init();
 	signsky_proc_start();
 
+	early = 0;
+	openlog("signsky", LOG_NDELAY | LOG_PID, LOG_DAEMON);
+
 	running = 1;
 
 	while (running) {
 		if ((sig = signsky_last_signal()) != -1) {
-			printf("parent received signal %d\n", sig);
+			syslog(LOG_INFO, "parent received signal %d", sig);
 			switch (sig) {
 			case SIGINT:
 			case SIGHUP:
@@ -125,7 +107,7 @@ main(int argc, char *argv[])
 }
 
 /*
- * Setup the given signal to be caught by our signal handler.
+ * Let the given signal be caught by our signal handler.
  */
 void
 signsky_signal_trap(int sig)
@@ -176,45 +158,22 @@ fatal(const char *fmt, ...)
 
 	PRECOND(fmt != NULL);
 
-	if ((proc = signsky_process()) != NULL)
-		fprintf(stderr, "proc-%s: ", proc->name);
-
+	proc = signsky_process();
 	va_start(args, fmt);
-	vfprintf(stderr, fmt, args);
+
+	if (early && proc == NULL) {
+		vfprintf(stderr, fmt, args);
+		fprintf(stderr, "\n");
+	} else {
+		vsyslog(LOG_ERR, fmt, args);
+	}
+
 	va_end(args);
 
 	if (proc == NULL)
 		signsky_proc_shutdown();
 
-	fprintf(stderr, "\n");
-
 	exit(1);
-}
-
-/*
- * Helper to parse the specified ip:port combo into the given sockaddr.
- */
-static void
-signsky_parse_host(char *host, struct sockaddr_in *sin)
-{
-	char		*port;
-	const char	*errstr;
-
-	PRECOND(host != NULL);
-	PRECOND(sin != NULL);
-
-	if ((port = strchr(host, ':')) == NULL)
-		fatal("'%s': argument must be in format ip:port", host);
-	*(port)++ = '\0';
-
-	if (inet_pton(AF_INET, host, &sin->sin_addr.s_addr) == -1)
-		fatal("ip '%s' invalid", host);
-
-	sin->sin_port = strtonum(port, 1, USHRT_MAX, &errstr);
-	if (errstr)
-		fatal("port '%s' invalid: %s", port, errstr);
-
-	sin->sin_port = htons(sin->sin_port);
 }
 
 /*

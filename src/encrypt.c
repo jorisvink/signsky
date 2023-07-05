@@ -53,12 +53,14 @@ signsky_encrypt_entry(struct signsky_proc *proc)
 	signsky_signal_trap(SIGQUIT);
 	signsky_signal_ignore(SIGINT);
 
-	running = 1;
 	memset(&sa_tx, 0, sizeof(sa_tx));
+
+	running = 1;
+	signsky_proc_privsep(proc);
 
 	while (running) {
 		if ((sig = signsky_last_signal()) != -1) {
-			printf("%s received signal %d\n", proc->name, sig);
+			syslog(LOG_NOTICE, "received signal %d", sig);
 			switch (sig) {
 			case SIGQUIT:
 				running = 0;
@@ -72,7 +74,7 @@ signsky_encrypt_entry(struct signsky_proc *proc)
 		usleep(10);
 	}
 
-	printf("%s exiting\n", proc->name);
+	syslog(LOG_NOTICE, "exiting");
 
 	exit(0);
 }

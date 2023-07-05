@@ -29,6 +29,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
+#include <syslog.h>
 
 /* A few handy macros. */
 #define errno_s		strerror(errno)
@@ -89,6 +90,8 @@ struct signsky_sa {
  */
 struct signsky_proc {
 	pid_t			pid;
+	uid_t			uid;
+	gid_t			gid;
 	u_int16_t		type;
 	void			*arg;
 	const char		*name;
@@ -183,15 +186,22 @@ struct signsky_state {
 	/* Local and remote addresses. */
 	struct sockaddr_in	peer;
 	struct sockaddr_in	local;
+
+	/* The users the different processes runas. */
+	const char		*runas[SIGNSKY_PROC_MAX];
 };
 
 extern struct signsky_state	*signsky;
+
+/* src/config.c */
+void	signsky_config_load(const char *);
 
 /* src/signsky.c */
 void	signsky_signal_trap(int);
 int	signsky_last_signal(void);
 void	signsky_signal_ignore(int);
-void	fatal(const char *, ...) __attribute__((format (printf, 1, 2)));
+void	fatal(const char *, ...) __attribute__((format (printf, 1, 2)))
+	    __attribute__((noreturn));
 
 /* src/proc. */
 void	signsky_proc_init(void);
@@ -199,6 +209,7 @@ void	signsky_proc_reap(void);
 void	signsky_proc_start(void);
 void	signsky_proc_killall(int);
 void	signsky_proc_shutdown(void);
+void	signsky_proc_privsep(struct signsky_proc *);
 void	signsky_proc_create(u_int16_t,
 	    void (*entry)(struct signsky_proc *), void *);
 

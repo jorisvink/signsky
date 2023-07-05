@@ -60,6 +60,7 @@ signsky_keying_entry(struct signsky_proc *proc)
 	int		sig, running;
 
 	PRECOND(proc != NULL);
+	PRECOND(proc->arg != NULL);
 
 	io = proc->arg;
 	keying_drop_access();
@@ -70,10 +71,11 @@ signsky_keying_entry(struct signsky_proc *proc)
 	pfd.fd = keying_bind_path();
 
 	running = 1;
+	signsky_proc_privsep(proc);
 
 	while (running) {
 		if ((sig = signsky_last_signal()) != -1) {
-			printf("keying received signal %d\n", sig);
+			syslog(LOG_NOTICE, "received signal %d", sig);
 			switch (sig) {
 			case SIGQUIT:
 				running = 0;
@@ -93,7 +95,7 @@ signsky_keying_entry(struct signsky_proc *proc)
 			keying_handle_request(pfd.fd);
 	}
 
-	printf("keying exiting\n");
+	syslog(LOG_NOTICE, "exiting");
 
 	exit(0);
 }
@@ -153,6 +155,8 @@ keying_handle_request(int fd)
 	struct sockaddr_un	peer;
 	socklen_t		socklen;
 
+	PRECOND(fd >= 0);
+
 	socklen = sizeof(peer);
 
 	for (;;) {
@@ -169,7 +173,7 @@ keying_handle_request(int fd)
 		if ((size_t)ret != sizeof(req.ss))
 			break;
 
-		printf("keying read %zd bytes\n", ret);
+		syslog(LOG_DEBUG, "keying read %zd bytes", ret);
 		break;
 	}
 }

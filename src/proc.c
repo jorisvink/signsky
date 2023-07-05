@@ -18,6 +18,7 @@
 #include <sys/shm.h>
 #include <sys/wait.h>
 
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -32,11 +33,11 @@ static LIST_HEAD(, signsky_proc)		proclist;
 /* Some human understand process types. */
 static const char *proctab[] = {
 	"unknown",
-	"clear",
-	"crypto",
-	"encrypt",
-	"decrypt",
-	"keying"
+	"signsky-clear",
+	"signsky-crypto",
+	"signsky-encrypt",
+	"signsky-decrypt",
+	"signsky-keying"
 };
 
 /* Points to the process its own signsky_proc, or NULL or parent. */
@@ -94,6 +95,7 @@ void
 signsky_proc_create(u_int16_t type,
     void (*entry)(struct signsky_proc *), void *arg)
 {
+	struct passwd		*pw;
 	struct signsky_proc	*proc;
 
 	PRECOND(type == SIGNSKY_PROC_CLEAR ||
@@ -104,6 +106,9 @@ signsky_proc_create(u_int16_t type,
 	PRECOND(entry != NULL);
 	/* arg is optional. */
 
+	if (signsky->runas[type] == NULL)
+		fatal("no runas user configured for %s", proctab[type]);
+
 	if ((proc = calloc(1, sizeof(*proc))) == NULL)
 		fatal("calloc: failed to allocate new proc entry");
 
@@ -112,23 +117,56 @@ signsky_proc_create(u_int16_t type,
 	proc->entry = entry;
 	proc->name = proctab[type];
 
+	if ((pw = getpwnam(signsky->runas[proc->type])) == NULL)
+		fatal("getpwnam(%s): %s", signsky->runas[proc->type], errno_s);
+
+	proc->uid = pw->pw_uid;
+	proc->gid = pw->pw_gid;
+
 	if ((proc->pid = fork()) == -1)
 		fatal("failed to fork child: %s", errno_s);
 
 	if (proc->pid == 0) {
+		openlog(proc->name, LOG_NDELAY | LOG_PID, LOG_DAEMON);
+
 		process = proc;
 		proc->pid = getpid(),
 		proc->entry(proc);
 		/* NOTREACHED */
 	}
 
-	printf("proc-%s started (%d)\n", proc->name, proc->pid);
+	syslog(LOG_INFO, "started %s (pid=%d)", proc->name, proc->pid);
 
 	LIST_INSERT_HEAD(&proclist, proc, list);
 }
 
 /*
- * Reap a single process. At some point this may restart the processes.
+ * Have a process drop its privileges.
+ */
+void
+signsky_proc_privsep(struct signsky_proc *proc)
+{
+	PRECOND(proc != NULL);
+
+	switch (proc->type) {
+	case SIGNSKY_PROC_CLEAR:
+	case SIGNSKY_PROC_CRYPTO:
+	case SIGNSKY_PROC_KEYING:
+	case SIGNSKY_PROC_ENCRYPT:
+	case SIGNSKY_PROC_DECRYPT:
+		break;
+	default:
+		fatal("%s: unknown process type %d", __func__, proc->type);
+	}
+
+	if (setgroups(1, &proc->gid) == -1 ||
+	    setgid(proc->gid) == -1 || setegid(proc->gid) == -1 ||
+	    setuid(proc->uid) == -1 || seteuid(proc->uid) == -1)
+		fatal("failed to drop privileges (%s)", errno_s);
+}
+
+/*
+ * Reap a single process.
  */
 void
 signsky_proc_reap(void)
@@ -151,7 +189,7 @@ signsky_proc_reap(void)
 
 		LIST_FOREACH(proc, &proclist, list) {
 			if (proc->pid == pid) {
-				printf("proc-%s exited (%d)\n",
+				syslog(LOG_NOTICE, "%s exited (%d)",
 				    proc->name, status);
 				LIST_REMOVE(proc, list);
 				free(proc);
@@ -171,8 +209,8 @@ signsky_proc_killall(int sig)
 
 	LIST_FOREACH(proc, &proclist, list) {
 		if (kill(proc->pid, sig) == -1) {
-			printf("failed to signal proc %u (%s)\n", proc->type,
-			    errno_s);
+			syslog(LOG_NOTICE, "failed to signal proc %u (%s)\n",
+			    proc->type, errno_s);
 		}
 	}
 }
