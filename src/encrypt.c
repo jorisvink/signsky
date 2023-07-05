@@ -35,7 +35,7 @@ static struct signsky_sa	sa_tx;
 static struct signsky_proc_io	*io = NULL;
 
 /*
- * The worker process responsible for encryption of packets coming
+ * The process responsible for encryption of packets coming
  * from the clear side of the tunnel.
  */
 void
@@ -101,11 +101,17 @@ encrypt_packet_process(struct signsky_packet *pkt)
 	PRECOND(pkt != NULL);
 	PRECOND(pkt->target == SIGNSKY_PROC_ENCRYPT);
 
+	if (signsky_atomic_read(&io->tx->valid) == 0) {
+		signsky_packet_release(pkt);
+		return;
+	}
+
 	hdr = signsky_packet_start(pkt);
 
-	hdr->pn = sa_tx.seqnr++;
+	hdr->pn = signsky_atomic_read(&io->tx->seqnr);
+	signsky_atomic_add(&io->tx->seqnr, 1);
 
-	hdr->esp.spi = sa_tx.spi;
+	hdr->esp.spi = signsky_atomic_read(&io->tx->spi);
 	hdr->esp.seq = hdr->pn & 0xffffffff;
 
 //	pkt->length += sizeof(*esp);

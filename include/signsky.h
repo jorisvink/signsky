@@ -90,8 +90,10 @@ extern int daemon(int, int);
  * and key.
  */
 struct signsky_sa {
-	u_int32_t		spi;
-	u_int64_t		seqnr;
+	volatile u_int32_t	spi;
+	volatile u_int64_t	seqnr;
+	volatile u_int32_t	valid;
+	u_int32_t		salt;
 	u_int8_t		key[SIGNSKY_KEY_LENGTH];
 };
 
@@ -164,18 +166,26 @@ struct signsky_ipsec_hdr {
 } __attribute__((packed));
 
 /* ESP trailer, added to the plaintext before encrypted. */
-struct signsky_esptrail {
+struct signsky_esp_trail {
 	u_int8_t		pad;
 	u_int8_t		next;
 } __attribute__((packed));
 
-/*
- * The available head room is the entire size of an signsky_ipsec_hdr.
- */
+/* The available head room is the entire size of an signsky_ipsec_hdr. */
 #define SIGNSKY_PACKET_HEAD_LEN		sizeof(struct signsky_ipsec_hdr)
+
+/*
+ * Maximum packet sizes we can receive from the interfaces.
+ * Clearly we don't do jumbo frames yet.
+ */
 #define SIGNSKY_PACKET_DATA_LEN		1500
-#define SIGNSKY_PACKET_MAX_LEN		\
-    (SIGNSKY_PACKET_HEAD_LEN + SIGNSKY_PACKET_DATA_LEN)
+
+/*
+ * The total space available in a packet buffer, we're lazy and just
+ * made it large enough to hold the head room, packet data and
+ * any tail that is going to be added to it.
+ */
+#define SIGNSKY_PACKET_MAX_LEN		2048
 
 /* The minimum size we can read from an interface. */
 #define SIGNSKY_PACKET_MIN_LEN		12
