@@ -4,6 +4,7 @@ CC?=cc
 OBJDIR?=obj
 
 BIN=signsky
+CIPHER?=openssl-aes-gcm
 
 CFLAGS+=-std=c99 -pedantic -Wall -Werror -Wstrict-prototypes
 CFLAGS+=-Wmissing-prototypes -Wmissing-declarations -Wshadow
@@ -29,6 +30,14 @@ SRC=	src/signsky.c \
 
 CFLAGS+=-fsanitize=address,undefined
 LDFLAGS+=-fsanitize=address,undefined
+
+ifeq ("$(CIPHER)", "openssl-aes-gcm")
+	CFLAGS+=$(shell pkg-config openssl --cflags)
+	LDFLAGS+=$(shell pkg-config openssl --libs)
+	SRC+=src/cipher_aes_gcm.c
+else
+$(error "No CIPHER selected")
+endif
 
 OSNAME=$(shell uname -s | sed -e 's/[-_].*//g' | tr A-Z a-z)
 ifeq ("$(OSNAME)", "linux")

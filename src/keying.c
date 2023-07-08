@@ -40,6 +40,7 @@ struct request {
 static int	keying_bind_path(void);
 static void	keying_drop_access(void);
 static void	keying_handle_request(int);
+static void	keying_install_key(struct signsky_key *, void *, size_t);
 
 /* The local queues. */
 static struct signsky_proc_io	*io = NULL;
@@ -173,7 +174,36 @@ keying_handle_request(int fd)
 		if ((size_t)ret != sizeof(req.ss))
 			break;
 
+		keying_install_key(io->tx, req.ss, sizeof(req.ss));
+
+		/* XXX track active vs pending */
+//		keying_install_key(io->rx[0], req.ss, sizeof(req.ss));
+//		keying_install_key(io->rx[1], req.ss, sizeof(req.ss));
+
 		syslog(LOG_DEBUG, "keying read %zd bytes", ret);
 		break;
 	}
+}
+
+static void
+keying_install_key(struct signsky_key *state, void *key, size_t len)
+{
+	PRECOND(state != NULL);
+	PRECOND(key != NULL);
+	PRECOND(len == SIGNSKY_KEY_LENGTH);
+
+	/* XXX */
+	while (signsky_atomic_read(&state->state) != SIGNSKY_KEY_EMPTY)
+		;
+
+	if (!signsky_atomic_cas_simple(&state->state,
+	    SIGNSKY_KEY_EMPTY, SIGNSKY_KEY_GENERATING))
+		fatal("failed to swap key state to generating");
+
+	memset(state->key, 'A', sizeof(state->key));
+	signsky_atomic_write(&state->spi, 0xdeadbeef);
+
+	if (!signsky_atomic_cas_simple(&state->state,
+	    SIGNSKY_KEY_GENERATING, SIGNSKY_KEY_PENDING))
+		fatal("failed to swap key state to pending");
 }

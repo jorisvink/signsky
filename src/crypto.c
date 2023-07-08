@@ -164,7 +164,7 @@ crypto_send_packet(int fd, struct signsky_packet *pkt)
 	PRECOND(pkt != NULL);
 
 	for (;;) {
-		data = signsky_packet_data(pkt);
+		data = signsky_packet_head(pkt);
 
 		if ((ret = sendto(fd, data, pkt->length, 0,
 		    (struct sockaddr *)&signsky->peer,
@@ -173,6 +173,12 @@ crypto_send_packet(int fd, struct signsky_packet *pkt)
 				break;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				break;
+			if (errno == ENETUNREACH || errno == EHOSTUNREACH) {
+				syslog(LOG_INFO, "host %s unreachable (%s)",
+				    inet_ntoa(signsky->peer.sin_addr),
+				    errno_s);
+				break;
+			}
 			fatal("sendto: %s", errno_s);
 		}
 

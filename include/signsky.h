@@ -85,15 +85,18 @@ extern int daemon(int, int);
 #define SIGNSKY_PROC_KEYING		5
 #define SIGNSKY_PROC_MAX		6
 
+/* Key states. */
+#define SIGNSKY_KEY_EMPTY		0
+#define SIGNSKY_KEY_GENERATING		1
+#define SIGNSKY_KEY_PENDING		2
+#define SIGNSKY_KEY_INSTALLING		3
+
 /*
- * A security association complete with SPI, current sequence number
- * and key.
+ * Used to swap TX / RX keys between keying and encrypt and decrypt processes.
  */
-struct signsky_sa {
+struct signsky_key {
 	volatile u_int32_t	spi;
-	volatile u_int64_t	seqnr;
-	volatile u_int32_t	valid;
-	u_int32_t		salt;
+	volatile int		state;
 	u_int8_t		key[SIGNSKY_KEY_LENGTH];
 };
 
@@ -118,8 +121,8 @@ struct signsky_proc {
  * do not need themselves.
  */
 struct signsky_proc_io {
-	struct signsky_sa	*tx;
-	struct signsky_sa	*rx[2];
+	struct signsky_key	*tx;
+	struct signsky_key	*rx[2];
 
 	struct signsky_ring	*clear;
 	struct signsky_ring	*crypto;
@@ -166,7 +169,7 @@ struct signsky_ipsec_hdr {
 } __attribute__((packed));
 
 /* ESP trailer, added to the plaintext before encrypted. */
-struct signsky_esp_trail {
+struct signsky_ipsec_tail {
 	u_int8_t		pad;
 	u_int8_t		next;
 } __attribute__((packed));
@@ -176,7 +179,7 @@ struct signsky_esp_trail {
 
 /*
  * Maximum packet sizes we can receive from the interfaces.
- * Clearly we don't do jumbo frames yet.
+ * Clearly we don't do jumbo frames.
  */
 #define SIGNSKY_PACKET_DATA_LEN		1500
 
@@ -241,7 +244,8 @@ void	signsky_packet_release(struct signsky_packet *);
 
 void	*signsky_packet_info(struct signsky_packet *);
 void	*signsky_packet_data(struct signsky_packet *);
-void	*signsky_packet_start(struct signsky_packet *);
+void	*signsky_packet_tail(struct signsky_packet *);
+void	*signsky_packet_head(struct signsky_packet *);
 
 struct signsky_packet	*signsky_packet_get(void);
 
@@ -262,6 +266,7 @@ struct signsky_ring	*signsky_ring_alloc(size_t);
 
 /* src/utils.c */
 void	signsky_shm_detach(void *);
+void	signsky_mem_zero(void *, size_t);
 void	*signsky_alloc_shared(size_t, int *);
 
 /* platform bits. */
@@ -275,5 +280,11 @@ void	signsky_keying_entry(struct signsky_proc *) __attribute__((noreturn));
 void	signsky_crypto_entry(struct signsky_proc *) __attribute__((noreturn));
 void	signsky_decrypt_entry(struct signsky_proc *) __attribute__((noreturn));
 void	signsky_encrypt_entry(struct signsky_proc *) __attribute__((noreturn));
+
+/* The cipher goo. */
+void	signsky_cipher_cleanup(void *);
+void	*signsky_cipher_setup(struct signsky_key *);
+void	signsky_cipher_encrypt(void *, const void *, size_t, const void *,
+	    size_t, struct signsky_packet *);
 
 #endif

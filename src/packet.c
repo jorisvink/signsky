@@ -69,10 +69,10 @@ signsky_packet_release(struct signsky_packet *pkt)
 }
 
 /*
- * Returns a pointer to the packet start (the location of the ESP header).
+ * Returns a pointer to the packet header (the location of the ESP header).
  */
 void *
-signsky_packet_start(struct signsky_packet *pkt)
+signsky_packet_head(struct signsky_packet *pkt)
 {
 	PRECOND(pkt != NULL);
 
@@ -89,4 +89,16 @@ signsky_packet_data(struct signsky_packet *pkt)
 	PRECOND(pkt->length <= SIGNSKY_PACKET_DATA_LEN);
 
 	return (&pkt->buf[SIGNSKY_PACKET_HEAD_LEN]);
+}
+
+/*
+ * Returns a pointer to the packet tail (immediately after the packet data).
+ */
+void *
+signsky_packet_tail(struct signsky_packet *pkt)
+{
+	PRECOND(pkt != NULL);
+	PRECOND(pkt->length <= SIGNSKY_PACKET_DATA_LEN);
+
+	return (&pkt->buf[SIGNSKY_PACKET_HEAD_LEN + pkt->length]);
 }

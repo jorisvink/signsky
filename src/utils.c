@@ -62,3 +62,24 @@ signsky_shm_detach(void *ptr)
 	if (shmdt(ptr) == -1)
 		fatal("failed to detach from 0x%p (%s)", ptr, errno_s);
 }
+
+/*
+ * Poor mans memset() that isn't optimized away on the platforms I use it on.
+ *
+ * If you build this on something and don't test that it actually clears the
+ * contents of the data, thats on you. You probably want to do some binary
+ * verification.
+ */
+void
+signsky_mem_zero(void *ptr, size_t len)
+{
+	volatile char	*p;
+
+	PRECOND(ptr != NULL);
+	PRECOND(len > 0);
+
+	p = (volatile char *)ptr;
+
+	while (len-- > 0)
+		*(p)++ = 0x00;
+}

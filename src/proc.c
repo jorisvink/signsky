@@ -63,9 +63,9 @@ signsky_proc_start(void)
 {
 	struct signsky_proc_io		io;
 
-	io.tx = signsky_alloc_shared(sizeof(struct signsky_sa), NULL);
-	io.rx[0] = signsky_alloc_shared(sizeof(struct signsky_sa), NULL);
-	io.rx[1] = signsky_alloc_shared(sizeof(struct signsky_sa), NULL);
+	io.tx = signsky_alloc_shared(sizeof(struct signsky_key), NULL);
+	io.rx[0] = signsky_alloc_shared(sizeof(struct signsky_key), NULL);
+	io.rx[1] = signsky_alloc_shared(sizeof(struct signsky_key), NULL);
 
 	io.clear = signsky_ring_alloc(1024);
 	io.crypto = signsky_ring_alloc(1024);
