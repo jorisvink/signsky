@@ -145,8 +145,16 @@ crypto_bind_address(void)
 	if (fcntl(fd, F_SETFL, val) == -1)
 		fatal("%s: fcntl: %s", __func__, errno_s);
 
+#if defined(__linux__)
+	val = IP_PMTUDISC_DO;
+	if (setsockopt(sd, IPPROTO_IP,
+	    IP_MTU_DISCOVER, &val, sizeof(val)) == -1)
+		fatal("%s: setsockopt: %s", __func__, errno_s);
+#else
+	val = 1;
 	if (setsockopt(fd, IPPROTO_IP, IP_DONTFRAG, &val, sizeof(val)) == -1)
 		fatal("%s: setsockopt: %s", __func__, errno_s);
+#endif
 
 	return (fd);
 }
