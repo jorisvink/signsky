@@ -122,6 +122,7 @@ int
 signsky_cipher_decrypt(void *arg, const void *nonce, size_t nonce_len,
     const void *aad, size_t aad_len, struct signsky_packet *pkt)
 {
+	size_t			ctlen;
 	struct cipher_aes_gcm	*cipher;
 	u_int8_t		*data, *tag;
 
@@ -137,13 +138,14 @@ signsky_cipher_decrypt(void *arg, const void *nonce, size_t nonce_len,
 
 	data = signsky_packet_data(pkt);
 	tag = &pkt->buf[pkt->length - CIPHER_AES_GCM_TAG_SIZE];
+	ctlen = tag - data;
 
 	CRYPTO_gcm128_setiv(cipher->gcm, nonce, nonce_len);
 
 	if (CRYPTO_gcm128_aad(cipher->gcm, aad, aad_len) != 0)
 		fatal("CRYPTO_gcm128_aad failed");
 
-	if (CRYPTO_gcm128_decrypt(cipher->gcm, data, data, pkt->length) != 0)
+	if (CRYPTO_gcm128_decrypt(cipher->gcm, data, data, ctlen) != 0)
 		fatal("CRYPTO_gcm128_decrypt failed");
 
 	if (CRYPTO_gcm128_finish(cipher->gcm, tag,
