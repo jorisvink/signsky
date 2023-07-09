@@ -201,6 +201,7 @@ decrypt_with_slot(struct signsky_sa *sa, struct signsky_packet *pkt)
 		return (-1);
 
 	/* XXX anti-replay update. */
+	/* XXX Update the remote address if needed. */
 
 	/*
 	 * Packet checks out, remove all overhead for IPSec and the cipher.
