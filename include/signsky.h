@@ -101,6 +101,16 @@ struct signsky_key {
 };
 
 /*
+ * An SA context with an SPI, salt, sequence number and underlying cipher.
+ */
+struct signsky_sa {
+	u_int32_t		spi;
+	u_int32_t		salt;
+	u_int64_t		seqnr;
+	void			*cipher;
+};
+
+/*
  * A process under the control of the parent process.
  */
 struct signsky_proc {
@@ -122,7 +132,7 @@ struct signsky_proc {
  */
 struct signsky_proc_io {
 	struct signsky_key	*tx;
-	struct signsky_key	*rx[2];
+	struct signsky_key	*rx;
 
 	struct signsky_ring	*clear;
 	struct signsky_ring	*crypto;
@@ -268,6 +278,7 @@ struct signsky_ring	*signsky_ring_alloc(size_t);
 void	signsky_shm_detach(void *);
 void	signsky_mem_zero(void *, size_t);
 void	*signsky_alloc_shared(size_t, int *);
+void	signsky_key_install(struct signsky_key *, struct signsky_sa *);
 
 /* platform bits. */
 int	signsky_platform_tundev_create(void);
@@ -286,6 +297,8 @@ size_t	signsky_cipher_overhead(void);
 void	signsky_cipher_cleanup(void *);
 void	*signsky_cipher_setup(struct signsky_key *);
 void	signsky_cipher_encrypt(void *, const void *, size_t, const void *,
+	    size_t, struct signsky_packet *);
+int	signsky_cipher_decrypt(void *, const void *, size_t, const void *,
 	    size_t, struct signsky_packet *);
 
 #endif

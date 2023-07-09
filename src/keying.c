@@ -175,10 +175,7 @@ keying_handle_request(int fd)
 			break;
 
 		keying_install_key(io->tx, req.ss, sizeof(req.ss));
-
-		/* XXX track active vs pending */
-//		keying_install_key(io->rx[0], req.ss, sizeof(req.ss));
-//		keying_install_key(io->rx[1], req.ss, sizeof(req.ss));
+		keying_install_key(io->rx, req.ss, sizeof(req.ss));
 
 		syslog(LOG_DEBUG, "keying read %zd bytes", ret);
 		break;

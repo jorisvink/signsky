@@ -25,19 +25,13 @@
 #include "signsky.h"
 
 static void	encrypt_drop_access(void);
-static void	encrypt_install_pending(void);
 static void	encrypt_packet_process(struct signsky_packet *);
 
 /* The shared queues. */
 static struct signsky_proc_io	*io = NULL;
 
 /* The local state for TX. */
-static struct {
-	u_int32_t		spi;
-	u_int32_t		salt;
-	u_int64_t		seqnr;
-	void			*cipher;
-} state;
+static struct signsky_sa	state;
 
 /*
  * The process responsible for encryption of packets coming
@@ -73,7 +67,7 @@ signsky_encrypt_entry(struct signsky_proc *proc)
 			}
 		}
 
-		encrypt_install_pending();
+		signsky_key_install(io->tx, &state);
 
 		while ((pkt = signsky_ring_dequeue(io->encrypt)))
 			encrypt_packet_process(pkt);
@@ -92,13 +86,11 @@ signsky_encrypt_entry(struct signsky_proc *proc)
 static void
 encrypt_drop_access(void)
 {
-	signsky_shm_detach(io->rx[0]);
-	signsky_shm_detach(io->rx[1]);
+	signsky_shm_detach(io->rx);
 	signsky_shm_detach(io->clear);
 	signsky_shm_detach(io->decrypt);
 
-	io->rx[0] = NULL;
-	io->rx[1] = NULL;
+	io->rx = NULL;
 	io->clear = NULL;
 	io->decrypt = NULL;
 }
@@ -118,7 +110,7 @@ encrypt_packet_process(struct signsky_packet *pkt)
 	PRECOND(pkt->target == SIGNSKY_PROC_ENCRYPT);
 
 	/* Install any pending TX key first. */
-	encrypt_install_pending();
+	signsky_key_install(io->tx, &state);
 
 	/* If we don't have a cipher state, we shall not submit. */
 	if (state.cipher == NULL) {
@@ -167,34 +159,4 @@ encrypt_packet_process(struct signsky_packet *pkt)
 
 	/* Ship it. */
 	signsky_ring_queue(io->crypto, pkt);
-}
-
-/*
- * Check if there is a pending TX key, and if there is cleanup the
- * previous cipher state, setup a new one and swap the key out.
- */
-static void
-encrypt_install_pending(void)
-{
-	PRECOND(io != NULL);
-	PRECOND(io->tx != NULL);
-
-	if (signsky_atomic_read(&io->tx->state) != SIGNSKY_KEY_PENDING)
-		return;
-
-	if (!signsky_atomic_cas_simple(&io->tx->state,
-	    SIGNSKY_KEY_PENDING, SIGNSKY_KEY_INSTALLING))
-		fatal("failed to swap key state to installing");
-
-	if (state.cipher != NULL)
-		signsky_cipher_cleanup(state.cipher);
-
-	state.cipher = signsky_cipher_setup(io->tx);
-
-	state.seqnr = 1;
-	state.spi = signsky_atomic_read(&io->tx->spi);
-
-	if (!signsky_atomic_cas_simple(&io->tx->state,
-	    SIGNSKY_KEY_INSTALLING, SIGNSKY_KEY_EMPTY))
-		fatal("failed to swap key state to empty");
 }

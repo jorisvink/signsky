@@ -26,9 +26,18 @@
 #include "signsky.h"
 
 static void	decrypt_drop_access(void);
+static void	decrypt_keys_install(void);
+static void	decrypt_packet_process(struct signsky_packet *);
+static int	decrypt_with_slot(struct signsky_sa *, struct signsky_packet *);
 
 /* The local queues. */
 static struct signsky_proc_io	*io = NULL;
+
+/* The local state for RX. */
+static struct {
+	struct signsky_sa	slot_1;
+	struct signsky_sa	slot_2;
+} state;
 
 /*
  * The worker process responsible for encryption of packets coming
@@ -49,6 +58,8 @@ signsky_decrypt_entry(struct signsky_proc *proc)
 	signsky_signal_trap(SIGQUIT);
 	signsky_signal_ignore(SIGINT);
 
+	memset(&state, 0, sizeof(state));
+
 	running = 1;
 	signsky_proc_privsep(proc);
 
@@ -62,9 +73,10 @@ signsky_decrypt_entry(struct signsky_proc *proc)
 			}
 		}
 
-		while ((pkt = signsky_ring_dequeue(io->decrypt))) {
-			signsky_ring_queue(io->clear, pkt);
-		}
+		decrypt_keys_install();
+
+		while ((pkt = signsky_ring_dequeue(io->decrypt)))
+			decrypt_packet_process(pkt);
 
 		usleep(10);
 	}
@@ -74,6 +86,9 @@ signsky_decrypt_entry(struct signsky_proc *proc)
 	exit(0);
 }
 
+/*
+ * Drop access to queues the decrypt process does not need.
+ */
 static void
 decrypt_drop_access(void)
 {
@@ -84,4 +99,119 @@ decrypt_drop_access(void)
 	io->tx = NULL;
 	io->crypto = NULL;
 	io->encrypt = NULL;
+}
+
+static void
+decrypt_keys_install(void)
+{
+	if (state.slot_1.cipher == NULL)
+		signsky_key_install(io->rx, &state.slot_1);
+	else
+		signsky_key_install(io->rx, &state.slot_2);
+}
+
+/*
+ * Decrypt and verify a single packet under the current RX key, or if
+ * that fails and there is a pending key, under the pending RX key.
+ *
+ * If successfull the packet is sent onto the clear interface.
+ * If the pending RX key was used, it becomes the active one.
+ */
+static void
+decrypt_packet_process(struct signsky_packet *pkt)
+{
+	size_t		minlen;
+
+	PRECOND(pkt != NULL);
+	PRECOND(pkt->target == SIGNSKY_PROC_DECRYPT);
+
+	decrypt_keys_install();
+
+	/* Belts and suspenders. */
+	minlen = sizeof(struct signsky_ipsec_hdr) +
+	    sizeof(struct signsky_ipsec_tail) +
+	    signsky_cipher_overhead();
+
+	if (pkt->length < minlen) {
+		signsky_packet_release(pkt);
+		return;
+	}
+
+	/* Try decrypting with the SA in slot_1. */
+	if (decrypt_with_slot(&state.slot_1, pkt) != -1)
+		return;
+
+	/* Didn't work, lets try the SA in slot_2. */
+	if (decrypt_with_slot(&state.slot_2, pkt) == -1) {
+		signsky_packet_release(pkt);
+		return;
+	}
+
+	/* We managed with slot_2, so we make slot_2 the primary. */
+	signsky_cipher_cleanup(state.slot_1.cipher);
+
+	state.slot_1.spi = state.slot_2.spi;
+	state.slot_1.salt = state.slot_2.salt;
+	state.slot_1.seqnr = state.slot_2.seqnr;
+	state.slot_1.cipher = state.slot_2.cipher;
+
+	signsky_mem_zero(&state.slot_2, sizeof(state.slot_2));
+}
+
+/*
+ * Attempt to verify and decrypt a packet using the given SA.
+ */
+static int
+decrypt_with_slot(struct signsky_sa *sa, struct signsky_packet *pkt)
+{
+	struct signsky_ipsec_hdr	*hdr;
+	struct signsky_ipsec_tail	*tail;
+	u_int8_t			nonce[12], aad[12];
+
+	PRECOND(sa != NULL);
+	PRECOND(pkt != NULL);
+
+	/* If the SA has no cipher context, don't bother. */
+	if (sa->cipher == NULL)
+		return (-1);
+
+	/* Match SPI. */
+	hdr = signsky_packet_head(pkt);
+	if (hdr->esp.spi != sa->spi)
+		return (-1);
+
+	/* XXX anti-replay check. */
+
+	/* Prepare the nonce and aad. */
+	memcpy(nonce, &sa->salt, sizeof(sa->salt));
+	memcpy(&nonce[sizeof(sa->salt)], &hdr->pn, sizeof(hdr->pn));
+
+	memcpy(aad, &sa->spi, sizeof(sa->spi));
+	memcpy(&aad[sizeof(sa->spi)], &hdr->pn, sizeof(hdr->pn));
+
+	/* Do the cipher dance. */
+	if (signsky_cipher_decrypt(sa->cipher, nonce, sizeof(nonce),
+	    aad, sizeof(aad), pkt) == -1)
+		return (-1);
+
+	/* XXX anti-replay update. */
+
+	/*
+	 * Packet checks out, remove the length of the tail and the
+	 * cipher overhead.
+	 *
+	 * The caller already verified that there was enough data in
+	 * the packet to satisfy the fact that there is a tail and cipher tag.
+	 */
+	pkt->length -= sizeof(struct signsky_ipsec_tail);
+	pkt->length -= signsky_cipher_overhead();
+
+	tail = signsky_packet_tail(pkt);
+	if (tail->pad != 0 || tail->next != IPPROTO_IPV4)
+		return (-1);
+
+	/* Ship it. */
+	signsky_ring_queue(io->clear, pkt);
+
+	return (0);
 }

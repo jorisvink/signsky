@@ -104,14 +104,12 @@ static void
 clear_drop_access(void)
 {
 	signsky_shm_detach(io->tx);
-	signsky_shm_detach(io->rx[0]);
-	signsky_shm_detach(io->rx[1]);
+	signsky_shm_detach(io->rx);
 	signsky_shm_detach(io->crypto);
 	signsky_shm_detach(io->decrypt);
 
 	io->tx = NULL;
-	io->rx[0] = NULL;
-	io->rx[1] = NULL;
+	io->rx = NULL;
 	io->crypto = NULL;
 	io->decrypt = NULL;
 }

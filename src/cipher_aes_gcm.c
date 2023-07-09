@@ -116,6 +116,44 @@ signsky_cipher_encrypt(void *arg, const void *nonce, size_t nonce_len,
 }
 
 /*
+ * Decrypt and verify a packet.
+ */
+int
+signsky_cipher_decrypt(void *arg, const void *nonce, size_t nonce_len,
+    const void *aad, size_t aad_len, struct signsky_packet *pkt)
+{
+	struct cipher_aes_gcm	*cipher;
+	u_int8_t		*data, *tag;
+
+	PRECOND(arg != NULL);
+	PRECOND(nonce != NULL);
+	PRECOND(aad != NULL);
+	PRECOND(pkt != NULL);
+
+	if (pkt->length < CIPHER_AES_GCM_TAG_SIZE)
+		return (-1);
+
+	cipher = arg;
+
+	data = signsky_packet_data(pkt);
+	tag = data + (pkt->length - CIPHER_AES_GCM_TAG_SIZE);
+
+	CRYPTO_gcm128_setiv(cipher->gcm, nonce, nonce_len);
+
+	if (CRYPTO_gcm128_aad(cipher->gcm, aad, aad_len) != 0)
+		fatal("CRYPTO_gcm128_aad failed");
+
+	if (CRYPTO_gcm128_decrypt(cipher->gcm, data, data, pkt->length) != 0)
+		fatal("CRYPTO_gcm128_decrypt failed");
+
+	if (CRYPTO_gcm128_finish(cipher->gcm, tag,
+	    CIPHER_AES_GCM_TAG_SIZE) != 0)
+		return (-1);
+
+	return (0);
+}
+
+/*
  * Cleanup the AES-GCM cipher states.
  */
 void

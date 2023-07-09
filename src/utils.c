@@ -20,6 +20,36 @@
 #include "signsky.h"
 
 /*
+ * Install the key pending under the given `key` data structure into
+ * the SA context `sa`.
+ */
+void
+signsky_key_install(struct signsky_key *key, struct signsky_sa *sa)
+{
+	PRECOND(key != NULL);
+	PRECOND(sa != NULL);
+
+	if (signsky_atomic_read(&key->state) != SIGNSKY_KEY_PENDING)
+		return;
+
+	if (!signsky_atomic_cas_simple(&key->state,
+	    SIGNSKY_KEY_PENDING, SIGNSKY_KEY_INSTALLING))
+		fatal("failed to swap key state to installing");
+
+	if (sa->cipher != NULL)
+		signsky_cipher_cleanup(sa->cipher);
+
+	sa->cipher = signsky_cipher_setup(key);
+
+	sa->seqnr = 1;
+	sa->spi = signsky_atomic_read(&key->spi);
+
+	if (!signsky_atomic_cas_simple(&key->state,
+	    SIGNSKY_KEY_INSTALLING, SIGNSKY_KEY_EMPTY))
+		fatal("failed to swap key state to empty");
+}
+
+/*
  * Allocate a shared memory segment with the given len as its size.
  * If key is not NULL, the shm key is written to it.
  *
@@ -83,3 +113,4 @@ signsky_mem_zero(void *ptr, size_t len)
 	while (len-- > 0)
 		*(p)++ = 0x00;
 }
+
