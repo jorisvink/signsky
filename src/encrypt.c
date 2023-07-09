@@ -158,5 +158,6 @@ encrypt_packet_process(struct signsky_packet *pkt)
 	pkt->length += sizeof(*hdr);
 
 	/* Ship it. */
-	signsky_ring_queue(io->crypto, pkt);
+	if (signsky_ring_queue(io->crypto, pkt) == -1)
+		signsky_packet_release(pkt);
 }

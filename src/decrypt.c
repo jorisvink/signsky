@@ -216,7 +216,8 @@ decrypt_with_slot(struct signsky_sa *sa, struct signsky_packet *pkt)
 		return (-1);
 
 	/* Ship it. */
-	signsky_ring_queue(io->clear, pkt);
+	if (signsky_ring_queue(io->clear, pkt) == -1)
+		signsky_packet_release(pkt);
 
 	return (0);
 }
