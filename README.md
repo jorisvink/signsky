@@ -1,5 +1,5 @@
 <img src="signsky.png" alt="signsky" width="128px" />
 
-sign.sky
+SIGN.SKY
 
 WIP.
