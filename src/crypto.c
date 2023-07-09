@@ -147,7 +147,7 @@ crypto_bind_address(void)
 
 #if defined(__linux__)
 	val = IP_PMTUDISC_DO;
-	if (setsockopt(sd, IPPROTO_IP,
+	if (setsockopt(fd, IPPROTO_IP,
 	    IP_MTU_DISCOVER, &val, sizeof(val)) == -1)
 		fatal("%s: setsockopt: %s", __func__, errno_s);
 #else
