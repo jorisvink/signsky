@@ -103,6 +103,9 @@ decrypt_drop_access(void)
 
 /*
  * Attempt to install any pending keys into the correct slot.
+ *
+ * Once we have a primary RX key in slot_1, all keys that are
+ * pending will be installed under slot_2 first.
  */
 static void
 decrypt_keys_install(void)
