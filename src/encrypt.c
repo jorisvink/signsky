@@ -155,7 +155,9 @@ encrypt_packet_process(struct signsky_packet *pkt)
 
 	/* Account for the header. */
 	VERIFY(pkt->length + sizeof(*hdr) < sizeof(pkt->buf));
+
 	pkt->length += sizeof(*hdr);
+	pkt->target = SIGNSKY_PROC_CRYPTO;
 
 	/* Ship it. */
 	if (signsky_ring_queue(io->crypto, pkt) == -1)

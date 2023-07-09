@@ -171,6 +171,7 @@ crypto_send_packet(int fd, struct signsky_packet *pkt)
 
 	PRECOND(fd >= 0);
 	PRECOND(pkt != NULL);
+	PRECOND(pkt->target == SIGNSKY_PROC_CRYPTO);
 
 	for (;;) {
 		data = signsky_packet_head(pkt);
@@ -238,6 +239,7 @@ crypto_recv_packets(int fd)
 			continue;
 
 		pkt->length = ret;
+		pkt->target = SIGNSKY_PROC_DECRYPT;
 
 		if (signsky_ring_queue(io->decrypt, pkt) == -1)
 			signsky_packet_release(pkt);

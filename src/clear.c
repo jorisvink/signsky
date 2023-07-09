@@ -125,6 +125,7 @@ clear_send_packet(int fd, struct signsky_packet *pkt)
 
 	PRECOND(fd >= 0);
 	PRECOND(pkt != NULL);
+	PRECOND(pkt->target == SIGNSKY_PROC_CRYPTO);
 
 	for (;;) {
 		if ((ret = signsky_platform_tundev_write(fd, pkt)) == -1) {
