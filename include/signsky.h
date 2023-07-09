@@ -282,6 +282,7 @@ void	signsky_decrypt_entry(struct signsky_proc *) __attribute__((noreturn));
 void	signsky_encrypt_entry(struct signsky_proc *) __attribute__((noreturn));
 
 /* The cipher goo. */
+size_t	signsky_cipher_overhead(void);
 void	signsky_cipher_cleanup(void *);
 void	*signsky_cipher_setup(struct signsky_key *);
 void	signsky_cipher_encrypt(void *, const void *, size_t, const void *,

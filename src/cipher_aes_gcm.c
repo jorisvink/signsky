@@ -70,6 +70,16 @@ signsky_cipher_setup(struct signsky_key *key)
 }
 
 /*
+ * Returns the overhead for AES-GCM. In this case it's the
+ * 16 byte tag.
+ */
+size_t
+signsky_cipher_overhead(void)
+{
+	return (CIPHER_AES_GCM_TAG_SIZE);
+}
+
+/*
  * Encrypt the packet data.
  * Automatically adds the integrity tag at the end of the ciphertext.
  */

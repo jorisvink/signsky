@@ -111,6 +111,7 @@ encrypt_packet_process(struct signsky_packet *pkt)
 {
 	struct signsky_ipsec_hdr	*hdr;
 	struct signsky_ipsec_tail	*tail;
+	size_t				overhead;
 	u_int8_t			nonce[12], aad[12];
 
 	PRECOND(pkt != NULL);
@@ -126,7 +127,10 @@ encrypt_packet_process(struct signsky_packet *pkt)
 	}
 
 	/* Belts and suspenders. */
-	if (sizeof(*hdr) + pkt->length + sizeof(*tail) > sizeof(pkt->buf)) {
+	overhead = sizeof(*hdr) + sizeof(*tail) + signsky_cipher_overhead();
+
+	if ((pkt->length + overhead < pkt->length) ||
+	    (pkt->length + overhead > sizeof(pkt->buf))) {
 		signsky_packet_release(pkt);
 		return;
 	}
@@ -139,6 +143,7 @@ encrypt_packet_process(struct signsky_packet *pkt)
 	hdr->esp.spi = state.spi;
 	hdr->esp.seq = hdr->pn & 0xffffffff;
 
+	/* We don't pad, RFC says its a SHOULD not a MUST. */
 	tail->pad = 0;
 	tail->next = IPPROTO_IPV4;
 
