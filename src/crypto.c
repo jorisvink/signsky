@@ -126,7 +126,7 @@ crypto_drop_access(void)
 static int
 crypto_bind_address(void)
 {
-	int		fd, flags;
+	int		fd, val;
 
 	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		fatal("%s: socket: %s", __func__, errno_s);
@@ -137,13 +137,16 @@ crypto_bind_address(void)
 	    sizeof(signsky->local)) == -1)
 		fatal("%s: connect: %s", __func__, errno_s);
 
-	if ((flags = fcntl(fd, F_GETFL, 0)) == -1)
+	if ((val = fcntl(fd, F_GETFL, 0)) == -1)
 		fatal("%s: fcntl: %s", __func__, errno_s);
 
-	flags |= O_NONBLOCK;
+	val |= O_NONBLOCK;
 
-	if (fcntl(fd, F_SETFL, flags) == -1)
+	if (fcntl(fd, F_SETFL, val) == -1)
 		fatal("%s: fcntl: %s", __func__, errno_s);
+
+	if (setsockopt(fd, IPPROTO_IP, IP_DONTFRAG, &val, sizeof(val)) == -1)
+		fatal("%s: setsockopt: %s", __func__, errno_s);
 
 	return (fd);
 }
