@@ -212,7 +212,7 @@ decrypt_with_slot(struct signsky_sa *sa, struct signsky_packet *pkt)
 	pkt->length -= signsky_cipher_overhead();
 
 	tail = signsky_packet_tail(pkt);
-	if (tail->pad != 0 || tail->next != IPPROTO_IPV4)
+	if (tail->pad != 0 || tail->next != IPPROTO_IP)
 		return (-1);
 
 	/* Ship it. */

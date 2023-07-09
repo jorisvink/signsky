@@ -137,7 +137,7 @@ encrypt_packet_process(struct signsky_packet *pkt)
 
 	/* We don't pad, RFC says its a SHOULD not a MUST. */
 	tail->pad = 0;
-	tail->next = IPPROTO_IPV4;
+	tail->next = IPPROTO_IP;
 
 	/* Tail is included in the plaintext. */
 	pkt->length += sizeof(*tail);
