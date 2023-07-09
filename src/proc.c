@@ -18,11 +18,11 @@
 #include <sys/shm.h>
 #include <sys/wait.h>
 
+#include <grp.h>
 #include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
-
 #include <unistd.h>
 
 #include "signsky.h"
