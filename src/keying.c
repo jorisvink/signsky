@@ -32,8 +32,10 @@
 
 #define KEY_SOCK_PATH		"/tmp/signsky.key"
 
+/*
+ * How a request over the UNIX socket must look like.
+ */
 struct request {
-	/* The shared secret from a key exchange. */
 	u_int8_t	ss[SIGNSKY_KEY_LENGTH];
 } __attribute__((packed));
 
@@ -101,6 +103,9 @@ signsky_keying_entry(struct signsky_proc *proc)
 	exit(0);
 }
 
+/*
+ * Drop access to queues that keying does not need.
+ */
 static void
 keying_drop_access(void)
 {
@@ -115,6 +120,10 @@ keying_drop_access(void)
 	io->decrypt = NULL;
 }
 
+/*
+ * Bind a local UNIX socket under KEY_SOCK_PATH so the new
+ * pre-session keys may be pushed.
+ */
 static int
 keying_bind_path(void)
 {
@@ -148,6 +157,9 @@ keying_bind_path(void)
 	return (fd);
 }
 
+/*
+ * Handle a request on the UNIX socket.
+ */
 static void
 keying_handle_request(int fd)
 {
@@ -174,6 +186,7 @@ keying_handle_request(int fd)
 		if ((size_t)ret != sizeof(req.ss))
 			break;
 
+		/* XXX - RX/TX derivation. */
 		keying_install_key(io->tx, req.ss, sizeof(req.ss));
 		keying_install_key(io->rx, req.ss, sizeof(req.ss));
 
@@ -182,6 +195,9 @@ keying_handle_request(int fd)
 	}
 }
 
+/*
+ * Install the given key into shared memory so that RX/TX can pick these up.
+ */
 static void
 keying_install_key(struct signsky_key *state, void *key, size_t len)
 {
