@@ -207,7 +207,7 @@ crypto_recv_packets(int fd)
 			pkt = &tpkt;
 
 		socklen = sizeof(peer);
-		data = signsky_packet_data(pkt);
+		data = signsky_packet_head(pkt);
 
 		if ((ret = recvfrom(fd, data, SIGNSKY_PACKET_DATA_LEN, 0,
 		    (struct sockaddr *)&peer, &socklen)) == -1) {

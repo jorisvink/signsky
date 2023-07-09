@@ -101,6 +101,9 @@ decrypt_drop_access(void)
 	io->encrypt = NULL;
 }
 
+/*
+ * Attempt to install any pending keys into the correct slot.
+ */
 static void
 decrypt_keys_install(void)
 {
@@ -197,12 +200,11 @@ decrypt_with_slot(struct signsky_sa *sa, struct signsky_packet *pkt)
 	/* XXX anti-replay update. */
 
 	/*
-	 * Packet checks out, remove the length of the tail and the
-	 * cipher overhead.
-	 *
+	 * Packet checks out, remove all overhead for IPSec and the cipher.
 	 * The caller already verified that there was enough data in
 	 * the packet to satisfy the fact that there is a tail and cipher tag.
 	 */
+	pkt->length -= sizeof(struct signsky_ipsec_hdr);
 	pkt->length -= sizeof(struct signsky_ipsec_tail);
 	pkt->length -= signsky_cipher_overhead();
 

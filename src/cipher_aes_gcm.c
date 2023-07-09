@@ -136,7 +136,7 @@ signsky_cipher_decrypt(void *arg, const void *nonce, size_t nonce_len,
 	cipher = arg;
 
 	data = signsky_packet_data(pkt);
-	tag = data + (pkt->length - CIPHER_AES_GCM_TAG_SIZE);
+	tag = &pkt->buf[pkt->length - CIPHER_AES_GCM_TAG_SIZE];
 
 	CRYPTO_gcm128_setiv(cipher->gcm, nonce, nonce_len);
 
