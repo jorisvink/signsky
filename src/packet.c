@@ -86,7 +86,6 @@ void *
 signsky_packet_data(struct signsky_packet *pkt)
 {
 	PRECOND(pkt != NULL);
-	PRECOND(pkt->length <= SIGNSKY_PACKET_DATA_LEN);
 
 	return (&pkt->buf[SIGNSKY_PACKET_HEAD_LEN]);
 }
