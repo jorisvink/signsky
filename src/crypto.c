@@ -225,7 +225,7 @@ crypto_recv_packets(int fd)
 		    (struct sockaddr *)&peer, &socklen)) == -1) {
 			if (pkt != &tpkt)
 				signsky_packet_release(pkt);
-			if (errno == EINTR)
+			if (errno == EINTR || errno == EIO)
 				break;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				break;

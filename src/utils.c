@@ -23,14 +23,14 @@
  * Install the key pending under the given `key` data structure into
  * the SA context `sa`.
  */
-void
+int
 signsky_key_install(struct signsky_key *key, struct signsky_sa *sa)
 {
 	PRECOND(key != NULL);
 	PRECOND(sa != NULL);
 
 	if (signsky_atomic_read(&key->state) != SIGNSKY_KEY_PENDING)
-		return;
+		return (-1);
 
 	if (!signsky_atomic_cas_simple(&key->state,
 	    SIGNSKY_KEY_PENDING, SIGNSKY_KEY_INSTALLING))
@@ -40,6 +40,7 @@ signsky_key_install(struct signsky_key *key, struct signsky_sa *sa)
 		signsky_cipher_cleanup(sa->cipher);
 
 	sa->cipher = signsky_cipher_setup(key);
+	signsky_mem_zero(key->key, sizeof(key->key));
 
 	sa->seqnr = 1;
 	sa->spi = signsky_atomic_read(&key->spi);
@@ -47,6 +48,8 @@ signsky_key_install(struct signsky_key *key, struct signsky_sa *sa)
 	if (!signsky_atomic_cas_simple(&key->state,
 	    SIGNSKY_KEY_INSTALLING, SIGNSKY_KEY_EMPTY))
 		fatal("failed to swap key state to empty");
+
+	return (0);
 }
 
 /*

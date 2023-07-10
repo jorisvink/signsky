@@ -129,7 +129,7 @@ clear_send_packet(int fd, struct signsky_packet *pkt)
 
 	for (;;) {
 		if ((ret = signsky_platform_tundev_write(fd, pkt)) == -1) {
-			if (errno == EINTR)
+			if (errno == EINTR || errno == EIO)
 				break;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				break;

@@ -1,5 +1,6 @@
 import kore
 import socket
+import struct
 
 class Negotiate:
     def configure(self, args):
@@ -10,11 +11,10 @@ class Negotiate:
 
     async def negotiate(self):
         s = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-        s.setblocking(False)
-
         sock = kore.socket_wrap(s)
 
-        await sock.sendto("/tmp/signsky.key", b"\x00" * 32)
+        data = struct.pack("=II32s", 0xdeadbeef, 0xcafebabe, b"\x00" * 32)
+        await sock.sendto("/tmp/signsky.key", data)
         kore.shutdown()
 
 koreapp = Negotiate()

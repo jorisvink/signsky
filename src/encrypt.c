@@ -67,7 +67,10 @@ signsky_encrypt_entry(struct signsky_proc *proc)
 			}
 		}
 
-		signsky_key_install(io->tx, &state);
+		if (signsky_key_install(io->tx, &state) != -1) {
+			syslog(LOG_NOTICE, "new TX SA (spi=0x%08x)",
+			    state.spi);
+		}
 
 		while ((pkt = signsky_ring_dequeue(io->encrypt)))
 			encrypt_packet_process(pkt);
@@ -110,7 +113,8 @@ encrypt_packet_process(struct signsky_packet *pkt)
 	PRECOND(pkt->target == SIGNSKY_PROC_ENCRYPT);
 
 	/* Install any pending TX key first. */
-	signsky_key_install(io->tx, &state);
+	if (signsky_key_install(io->tx, &state) != -1)
+		syslog(LOG_NOTICE, "new TX SA (spi=0x%08x)", state.spi);
 
 	/* If we don't have a cipher state, we shall not submit. */
 	if (state.cipher == NULL) {
@@ -132,8 +136,8 @@ encrypt_packet_process(struct signsky_packet *pkt)
 	tail = signsky_packet_tail(pkt);
 
 	hdr->pn = state.seqnr++;
-	hdr->esp.spi = state.spi;
-	hdr->esp.seq = hdr->pn & 0xffffffff;
+	hdr->esp.spi = htobe32(state.spi);
+	hdr->esp.seq = htobe32(hdr->pn & 0xffffffff);
 
 	/* We don't pad, RFC says its a SHOULD not a MUST. */
 	tail->pad = 0;
@@ -148,6 +152,8 @@ encrypt_packet_process(struct signsky_packet *pkt)
 
 	memcpy(aad, &state.spi, sizeof(state.spi));
 	memcpy(&aad[sizeof(state.spi)], &hdr->pn, sizeof(hdr->pn));
+
+	hdr->pn = htobe64(hdr->pn);
 
 	/* Do the cipher dance. */
 	signsky_cipher_encrypt(state.cipher, nonce, sizeof(nonce),

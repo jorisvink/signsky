@@ -39,6 +39,12 @@
 #if defined(__APPLE__)
 #undef daemon
 extern int daemon(int, int);
+
+#include <libkern/OSByteOrder.h>
+#define htobe32(x)		OSSwapHostToBigInt32(x)
+#define htobe64(x)		OSSwapHostToBigInt64(x)
+#define be32toh(x)		OSSwapBigToHostInt32(x)
+#define be64toh(x)		OSSwapBigToHostInt64(x)
 #endif
 
 /* A few handy macros. */
@@ -278,7 +284,7 @@ struct signsky_ring	*signsky_ring_alloc(size_t);
 void	signsky_shm_detach(void *);
 void	signsky_mem_zero(void *, size_t);
 void	*signsky_alloc_shared(size_t, int *);
-void	signsky_key_install(struct signsky_key *, struct signsky_sa *);
+int	signsky_key_install(struct signsky_key *, struct signsky_sa *);
 
 /* platform bits. */
 int	signsky_platform_tundev_create(void);

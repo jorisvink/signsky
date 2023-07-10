@@ -36,13 +36,15 @@
  * How a request over the UNIX socket must look like.
  */
 struct request {
+	u_int32_t	tx_spi;
+	u_int32_t	rx_spi;
 	u_int8_t	ss[SIGNSKY_KEY_LENGTH];
 } __attribute__((packed));
 
 static int	keying_bind_path(void);
 static void	keying_drop_access(void);
 static void	keying_handle_request(int);
-static void	keying_install_key(struct signsky_key *, void *, size_t);
+static void	keying_install(struct signsky_key *, u_int32_t, void *, size_t);
 
 /* The local queues. */
 static struct signsky_proc_io	*io = NULL;
@@ -173,7 +175,7 @@ keying_handle_request(int fd)
 	socklen = sizeof(peer);
 
 	for (;;) {
-		if ((ret = recvfrom(fd, req.ss, sizeof(req.ss), 0,
+		if ((ret = recvfrom(fd, &req, sizeof(req), 0,
 		    (struct sockaddr *)&peer, &socklen)) == -1) {
 			if (errno == EINTR)
 				continue;
@@ -183,14 +185,12 @@ keying_handle_request(int fd)
 		if (ret == 0)
 			fatal("eof on keying socket");
 
-		if ((size_t)ret != sizeof(req.ss))
+		if ((size_t)ret != sizeof(req))
 			break;
 
 		/* XXX - RX/TX derivation. */
-		keying_install_key(io->tx, req.ss, sizeof(req.ss));
-		keying_install_key(io->rx, req.ss, sizeof(req.ss));
-
-		syslog(LOG_DEBUG, "keying read %zd bytes", ret);
+		keying_install(io->tx, req.tx_spi, req.ss, sizeof(req.ss));
+		keying_install(io->rx, req.rx_spi, req.ss, sizeof(req.ss));
 		break;
 	}
 }
@@ -199,9 +199,10 @@ keying_handle_request(int fd)
  * Install the given key into shared memory so that RX/TX can pick these up.
  */
 static void
-keying_install_key(struct signsky_key *state, void *key, size_t len)
+keying_install(struct signsky_key *state, u_int32_t spi, void *key, size_t len)
 {
 	PRECOND(state != NULL);
+	PRECOND(spi > 0);
 	PRECOND(key != NULL);
 	PRECOND(len == SIGNSKY_KEY_LENGTH);
 
@@ -213,8 +214,8 @@ keying_install_key(struct signsky_key *state, void *key, size_t len)
 	    SIGNSKY_KEY_EMPTY, SIGNSKY_KEY_GENERATING))
 		fatal("failed to swap key state to generating");
 
-	memset(state->key, 'A', sizeof(state->key));
-	signsky_atomic_write(&state->spi, 0xdeadbeef);
+	memcpy(state->key, key, len);
+	signsky_atomic_write(&state->spi, spi);
 
 	if (!signsky_atomic_cas_simple(&state->state,
 	    SIGNSKY_KEY_GENERATING, SIGNSKY_KEY_PENDING))

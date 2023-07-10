@@ -110,10 +110,17 @@ decrypt_drop_access(void)
 static void
 decrypt_keys_install(void)
 {
-	if (state.slot_1.cipher == NULL)
-		signsky_key_install(io->rx, &state.slot_1);
-	else
-		signsky_key_install(io->rx, &state.slot_2);
+	if (state.slot_1.cipher == NULL) {
+		if (signsky_key_install(io->rx, &state.slot_1) != -1) {
+			syslog(LOG_NOTICE, "new RX SA (spi=0x%08x)",
+			    state.slot_1.spi);
+		}
+	} else {
+		if (signsky_key_install(io->rx, &state.slot_2) != -1) {
+			syslog(LOG_NOTICE, "pending RX SA (spi=0x%08x)",
+			    state.slot_2.spi);
+		}
+	}
 }
 
 /*
@@ -126,7 +133,8 @@ decrypt_keys_install(void)
 static void
 decrypt_packet_process(struct signsky_packet *pkt)
 {
-	size_t		minlen;
+	struct signsky_ipsec_hdr	*hdr;
+	size_t				minlen;
 
 	PRECOND(pkt != NULL);
 	PRECOND(pkt->target == SIGNSKY_PROC_DECRYPT);
@@ -143,6 +151,12 @@ decrypt_packet_process(struct signsky_packet *pkt)
 		return;
 	}
 
+	/* Convert relevant fields to host order. */
+	hdr = signsky_packet_head(pkt);
+	hdr->esp.spi = be32toh(hdr->esp.spi);
+	hdr->esp.seq = be32toh(hdr->esp.seq);
+	hdr->pn = be64toh(hdr->pn);
+
 	/* Try decrypting with the SA in slot_1. */
 	if (decrypt_with_slot(&state.slot_1, pkt) != -1)
 		return;
@@ -152,6 +166,8 @@ decrypt_packet_process(struct signsky_packet *pkt)
 		signsky_packet_release(pkt);
 		return;
 	}
+
+	syslog(LOG_NOTICE, "swapping RX SA (spi=0x%08x)", state.slot_2.spi);
 
 	/* We managed with slot_2, so we make slot_2 the primary. */
 	signsky_cipher_cleanup(state.slot_1.cipher);

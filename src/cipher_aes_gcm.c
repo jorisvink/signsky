@@ -60,8 +60,6 @@ signsky_cipher_setup(struct signsky_key *key)
 	if (AES_set_encrypt_key(key->key, 256, &cipher->key) != 0)
 		fatal("AES_set_encrypt_key: failed");
 
-	signsky_mem_zero(key->key, sizeof(key->key));
-
 	if ((cipher->gcm = CRYPTO_gcm128_new(&cipher->key,
 	    (block128_f)AES_encrypt)) == NULL)
 		fatal("CRYPTO_gcm128_new: failed");
