@@ -18,9 +18,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,42 +26,28 @@
 
 #include "signsky.h"
 
+#define STATUS_REQUEST_DUMP		1
+
+static void	status_handle_request(int);
+
 /*
- * How a request over the UNIX socket must look like.
+ * How a status request looks like on the wire.
  */
 struct request {
-	u_int32_t	tx_spi;
-	u_int32_t	rx_spi;
-	u_int8_t	ss[SIGNSKY_KEY_LENGTH];
+	u_int8_t	cmd;
 } __attribute__((packed));
 
-static void	keying_drop_access(void);
-static void	keying_handle_request(int);
-static void	keying_install(struct signsky_key *, u_int32_t, void *, size_t);
-
-/* The local queues. */
-static struct signsky_proc_io	*io = NULL;
-
 /*
- * The keying process.
- *
- * This process is will receive new key material via a unix socket and
- * derive new RX/TX keys from it, together with the base symmetrical key.
- *
- * The RX/TX session keys are then installed in the decrypt and encrypt
- * processes respectively.
+ * The status process, handles incoming status requests.
  */
 void
-signsky_keying_entry(struct signsky_proc *proc)
+signsky_status_entry(struct signsky_proc *proc)
 {
 	struct pollfd	pfd;
 	int		sig, running;
 
 	PRECOND(proc != NULL);
-	PRECOND(proc->arg != NULL);
-
-	io = proc->arg;
-	keying_drop_access();
+	PRECOND(proc->arg == NULL);
 
 	signsky_signal_trap(SIGQUIT);
 	signsky_signal_ignore(SIGINT);
@@ -93,7 +76,8 @@ signsky_keying_entry(struct signsky_proc *proc)
 		}
 
 		if (pfd.revents & POLLIN)
-			keying_handle_request(pfd.fd);
+			status_handle_request(pfd.fd);
+
 	}
 
 	syslog(LOG_NOTICE, "exiting");
@@ -102,29 +86,10 @@ signsky_keying_entry(struct signsky_proc *proc)
 }
 
 /*
- * Drop access to queues that keying does not need.
- */
-static void
-keying_drop_access(void)
-{
-	signsky_shm_detach(io->arwin);
-	signsky_shm_detach(io->clear);
-	signsky_shm_detach(io->crypto);
-	signsky_shm_detach(io->encrypt);
-	signsky_shm_detach(io->decrypt);
-
-	io->clear = NULL;
-	io->arwin = NULL;
-	io->crypto = NULL;
-	io->encrypt = NULL;
-	io->decrypt = NULL;
-}
-
-/*
  * Handle a request on the UNIX socket.
  */
 static void
-keying_handle_request(int fd)
+status_handle_request(int fd)
 {
 	ssize_t			ret;
 	struct request		req;
@@ -149,35 +114,6 @@ keying_handle_request(int fd)
 		if ((size_t)ret != sizeof(req))
 			break;
 
-		/* XXX - RX/TX derivation. */
-		keying_install(io->tx, req.tx_spi, req.ss, sizeof(req.ss));
-		keying_install(io->rx, req.rx_spi, req.ss, sizeof(req.ss));
 		break;
 	}
-}
-
-/*
- * Install the given key into shared memory so that RX/TX can pick these up.
- */
-static void
-keying_install(struct signsky_key *state, u_int32_t spi, void *key, size_t len)
-{
-	PRECOND(state != NULL);
-	PRECOND(spi > 0);
-	PRECOND(key != NULL);
-	PRECOND(len == SIGNSKY_KEY_LENGTH);
-
-	while (signsky_atomic_read(&state->state) != SIGNSKY_KEY_EMPTY)
-		signsky_cpu_pause();
-
-	if (!signsky_atomic_cas_simple(&state->state,
-	    SIGNSKY_KEY_EMPTY, SIGNSKY_KEY_GENERATING))
-		fatal("failed to swap key state to generating");
-
-	memcpy(state->key, key, len);
-	signsky_atomic_write(&state->spi, spi);
-
-	if (!signsky_atomic_cas_simple(&state->state,
-	    SIGNSKY_KEY_GENERATING, SIGNSKY_KEY_PENDING))
-		fatal("failed to swap key state to pending");
 }

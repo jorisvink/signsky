@@ -64,6 +64,7 @@ static const struct {
 	{ "keying",		SIGNSKY_PROC_KEYING },
 	{ "encrypt",		SIGNSKY_PROC_ENCRYPT },
 	{ "decrypt",		SIGNSKY_PROC_DECRYPT },
+	{ "status",		SIGNSKY_PROC_STATUS },
 	{ NULL,			0 },
 };
 

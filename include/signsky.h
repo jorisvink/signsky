@@ -112,7 +112,8 @@ extern int daemon(int, int);
 #define SIGNSKY_PROC_ENCRYPT		3
 #define SIGNSKY_PROC_DECRYPT		4
 #define SIGNSKY_PROC_KEYING		5
-#define SIGNSKY_PROC_MAX		6
+#define SIGNSKY_PROC_STATUS		6
+#define SIGNSKY_PROC_MAX		7
 
 /* Key states. */
 #define SIGNSKY_KEY_EMPTY		0
@@ -351,6 +352,7 @@ ssize_t	signsky_platform_tundev_write(int, struct signsky_packet *);
 
 /* Worker entry points. */
 void	signsky_clear_entry(struct signsky_proc *) __attribute__((noreturn));
+void	signsky_status_entry(struct signsky_proc *) __attribute__((noreturn));
 void	signsky_keying_entry(struct signsky_proc *) __attribute__((noreturn));
 void	signsky_crypto_entry(struct signsky_proc *) __attribute__((noreturn));
 void	signsky_decrypt_entry(struct signsky_proc *) __attribute__((noreturn));

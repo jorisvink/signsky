@@ -39,7 +39,8 @@ static const char *proctab[] = {
 	"crypto",
 	"encrypt",
 	"decrypt",
-	"keying"
+	"keying",
+	"status"
 };
 
 /* Points to the process its own signsky_proc, or NULL or parent. */
@@ -88,6 +89,8 @@ signsky_proc_start(void)
 {
 	struct signsky_proc_io		io;
 
+	signsky_proc_create(SIGNSKY_PROC_STATUS, signsky_status_entry, NULL);
+
 	io.tx = signsky_alloc_shared(sizeof(struct signsky_key), NULL);
 	io.rx = signsky_alloc_shared(sizeof(struct signsky_key), NULL);
 	io.arwin = signsky_alloc_shared(sizeof(struct signsky_arwin), NULL);
@@ -127,7 +130,8 @@ signsky_proc_create(u_int16_t type,
 	    type == SIGNSKY_PROC_CRYPTO ||
 	    type == SIGNSKY_PROC_ENCRYPT ||
 	    type == SIGNSKY_PROC_DECRYPT ||
-	    type == SIGNSKY_PROC_KEYING);
+	    type == SIGNSKY_PROC_KEYING ||
+	    type == SIGNSKY_PROC_STATUS);
 	PRECOND(entry != NULL);
 	/* arg is optional. */
 
@@ -178,6 +182,7 @@ signsky_proc_privsep(struct signsky_proc *proc)
 	case SIGNSKY_PROC_CLEAR:
 	case SIGNSKY_PROC_CRYPTO:
 	case SIGNSKY_PROC_KEYING:
+	case SIGNSKY_PROC_STATUS:
 	case SIGNSKY_PROC_ENCRYPT:
 	case SIGNSKY_PROC_DECRYPT:
 		break;

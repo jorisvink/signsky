@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 #include <sys/un.h>
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -65,7 +66,7 @@ int
 signsky_unix_socket(struct signsky_sun *cfg)
 {
 	struct sockaddr_un	sun;
-	int			fd, len;
+	int			fd, len, flags;
 
 	PRECOND(cfg != NULL);
 
@@ -90,6 +91,14 @@ signsky_unix_socket(struct signsky_sun *cfg)
 
 	if (chmod(sun.sun_path, S_IRWXU) == -1)
 		fatal("chmod(%s): %s", sun.sun_path, errno_s);
+
+	if ((flags = fcntl(fd, F_GETFL, 0)) == -1)
+		fatal("fcntl: %s", errno_s);
+
+	flags |= O_NONBLOCK;
+
+	if (fcntl(fd, F_SETFL, flags) == -1)
+		fatal("fcntl: %s", errno_s);
 
 	return (fd);
 }

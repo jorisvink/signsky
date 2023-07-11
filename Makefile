@@ -23,6 +23,7 @@ SRC=	src/signsky.c \
 	src/packet.c \
 	src/pool.c \
 	src/ring.c \
+	src/status.c \
 	src/utils.c
 
 #ifeq ("$(SANITIZE)", "1")
