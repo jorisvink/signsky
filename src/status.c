@@ -52,7 +52,7 @@ signsky_status_entry(struct signsky_proc *proc)
 	signsky_signal_trap(SIGQUIT);
 	signsky_signal_ignore(SIGINT);
 
-	pfd.fd = signsky_unix_socket(&signsky->keying);
+	pfd.fd = signsky_unix_socket(&signsky->status);
 
 	running = 1;
 	signsky_proc_privsep(proc);
