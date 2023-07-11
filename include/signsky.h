@@ -267,6 +267,11 @@ struct signsky_state {
 
 	/* The users the different processes runas. */
 	const char		*runas[SIGNSKY_PROC_MAX];
+
+	/* The keying socket path and its owner. */
+	uid_t			keying_uid;
+	gid_t			keying_gid;
+	char			*keying_path;
 };
 
 extern struct signsky_state	*signsky;

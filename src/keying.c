@@ -16,6 +16,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 
 #include <arpa/inet.h>
@@ -30,8 +31,6 @@
 
 #include "signsky.h"
 
-#define KEY_SOCK_PATH		"/tmp/signsky.key"
-
 /*
  * How a request over the UNIX socket must look like.
  */
@@ -41,9 +40,9 @@ struct request {
 	u_int8_t	ss[SIGNSKY_KEY_LENGTH];
 } __attribute__((packed));
 
-static int	keying_bind_path(void);
 static void	keying_drop_access(void);
 static void	keying_handle_request(int);
+static int	keying_create_socket(void);
 static void	keying_install(struct signsky_key *, u_int32_t, void *, size_t);
 
 /* The local queues. */
@@ -73,7 +72,7 @@ signsky_keying_entry(struct signsky_proc *proc)
 	signsky_signal_trap(SIGQUIT);
 	signsky_signal_ignore(SIGINT);
 
-	pfd.fd = keying_bind_path();
+	pfd.fd = keying_create_socket();
 
 	running = 1;
 	signsky_proc_privsep(proc);
@@ -125,14 +124,16 @@ keying_drop_access(void)
 }
 
 /*
- * Bind a local UNIX socket under KEY_SOCK_PATH so the new
- * pre-session keys may be pushed.
+ * Create a local UNIX socket on the configured keying path and
+ * change its user to the configured owner.
  */
 static int
-keying_bind_path(void)
+keying_create_socket(void)
 {
 	struct sockaddr_un	sun;
-	int			fd, flags, len;
+	int			fd, flags;
+
+	PRECOND(signsky->keying_path != NULL);
 
 	if ((fd = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
 		fatal("socket: %s", errno_s);
@@ -140,15 +141,26 @@ keying_bind_path(void)
 	memset(&sun, 0, sizeof(sun));
 	sun.sun_family = AF_UNIX;
 
-	len = snprintf(sun.sun_path, sizeof(sun.sun_path), "%s", KEY_SOCK_PATH);
-	if (len == -1 || (size_t)len >= sizeof(sun.sun_path))
-		fatal("the socket path didnt fit into sun.sun_path");
+	if (strlcpy(sun.sun_path, signsky->keying_path,
+	    sizeof(sun.sun_path)) >= sizeof(sun.sun_path)) {
+		fatal("keying path '%s' didnt fit into sun.sun_path",
+		    signsky->keying_path);
+	}
+
+	free(signsky->keying_path);
+	signsky->keying_path = NULL;
 
 	if (unlink(sun.sun_path) == -1 && errno != ENOENT)
 		fatal("unlink(%s): %s", sun.sun_path, errno_s);
 
 	if (bind(fd, (const struct sockaddr *)&sun, sizeof(sun)) == -1)
 		fatal("bind(%s): %s", sun.sun_path, errno_s);
+
+	if (chown(sun.sun_path, signsky->keying_uid, signsky->keying_gid) == -1)
+		fatal("chown(%s): %s", sun.sun_path, errno_s);
+
+	if (chmod(sun.sun_path, S_IRWXU) == -1)
+		fatal("chmod(%s): %s", sun.sun_path, errno_s);
 
 	if ((flags = fcntl(fd, F_GETFL, 0)) == -1)
 		fatal("fcntl: %s", errno_s);

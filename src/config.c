@@ -21,6 +21,7 @@
 
 #include <ctype.h>
 #include <limits.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -33,6 +34,7 @@
 static void	config_parse_peer(char *);
 static void	config_parse_local(char *);
 static void	config_parse_runas(char *);
+static void	config_parse_keying(char *);
 static void	config_parse_host(char *, struct sockaddr_in *);
 
 static char	*config_read_line(FILE *, char *, size_t);
@@ -44,6 +46,7 @@ static const struct {
 	{ "peer",		config_parse_peer },
 	{ "local",		config_parse_local },
 	{ "run",		config_parse_runas },
+	{ "keying",		config_parse_keying },
 	{ NULL,			NULL },
 };
 
@@ -95,6 +98,9 @@ signsky_config_load(const char *file)
 		fatal("error reading the configuration file");
 
 	fclose(fp);
+
+	if (signsky->keying_path == NULL)
+		fatal("no keying path was given, this is not optional");
 }
 
 static char *
@@ -176,6 +182,29 @@ config_parse_runas(char *runas)
 
 	if ((signsky->runas[type] = strdup(user)) == NULL)
 		fatal("strdup");
+}
+
+static void
+config_parse_keying(char *path)
+{
+	struct passwd	*pw;
+	char		*owner;
+
+	PRECOND(path != NULL);
+
+	if ((owner = strrchr(path, ' ')) == NULL)
+		fatal("option 'keying %s' invalid", path);
+
+	*(owner)++ = '\0';
+
+	if ((pw = getpwnam(owner)) == NULL)
+		fatal("user '%s' does not exist", owner);
+
+	if ((signsky->keying_path = strdup(path)) == NULL)
+		fatal("strdup failed");
+
+	signsky->keying_uid = pw->pw_uid;
+	signsky->keying_gid = pw->pw_gid;
 }
 
 static void
