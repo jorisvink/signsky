@@ -305,6 +305,7 @@ void	signsky_proc_start(void);
 void	signsky_proc_killall(int);
 void	signsky_proc_init(char **);
 void	signsky_proc_shutdown(void);
+void	signsky_proc_title(const char *);
 void	signsky_proc_privsep(struct signsky_proc *);
 void	signsky_proc_create(u_int16_t,
 	    void (*entry)(struct signsky_proc *), void *);

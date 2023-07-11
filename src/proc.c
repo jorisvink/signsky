@@ -27,8 +27,6 @@
 
 #include "signsky.h"
 
-static void	proc_title(const char *);
-
 /* List of all worker processes. */
 static LIST_HEAD(, signsky_proc)		proclist;
 
@@ -157,7 +155,7 @@ signsky_proc_create(u_int16_t type,
 
 	if (proc->pid == 0) {
 		openlog(proc->name, LOG_NDELAY | LOG_PID, LOG_DAEMON);
-		proc_title(proc->name);
+		signsky_proc_title(proc->name);
 
 		process = proc;
 		proc->pid = getpid(),
@@ -272,8 +270,8 @@ signsky_process(void)
 /*
  * Set a process title by overwriting the argv[] arguments.
  */
-static void
-proc_title(const char *name)
+void
+signsky_proc_title(const char *name)
 {
 	int	len;
 

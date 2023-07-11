@@ -89,6 +89,7 @@ main(int argc, char *argv[])
 	}
 
 	openlog("signsky", LOG_NDELAY | LOG_PID, LOG_DAEMON);
+	signsky_proc_title("overwatch");
 
 	running = 1;
 	syslog(LOG_INFO, "signsky started");
