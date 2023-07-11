@@ -192,6 +192,12 @@ crypto_send_packet(int fd, struct signsky_packet *pkt)
 				continue;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				break;
+			if (errno == EMSGSIZE) {
+				syslog(LOG_INFO,
+				    "packet (size=%zu) too large for crypto, "
+				    "lower tunnel MTU", pkt->length);
+				break;
+			}
 			if (errno == ENETUNREACH || errno == EHOSTUNREACH) {
 				syslog(LOG_INFO, "host %s unreachable (%s)",
 				    inet_ntoa(signsky->peer.sin_addr),
