@@ -23,25 +23,6 @@
  */
 
 /*
- * Use architecture specific instructions to hint to the CPU that
- * we are in a spinloop hopefully avoiding a memory order violation
- * which would incur a performance hit.
- */
-#if defined(__arm64__) || defined(__aarch64__)
-#define ring_cpu_pause()					\
-	do {							\
-		__asm__ volatile("yield" ::: "memory");		\
-	} while (0)
-#elif defined(__x86_64__)
-#define ring_cpu_pause()					\
-	do {							\
-		__asm__ volatile("pause" ::: "memory");		\
-	} while (0)
-#else
-#error "unsupported architecture"
-#endif
-
-/*
  * Allocate a new ring of the given number of elements. This must
  * be a power of 2 and must be maximum 4096. This is checked in
  * the signsky_ring_init() function.
@@ -135,7 +116,7 @@ dequeue_again:
 	uptr = signsky_atomic_read(&ring->data[slot]);
 
 	while (!signsky_atomic_cas_simple(&ring->consumer.tail, head, next))
-		ring_cpu_pause();
+		signsky_cpu_pause();
 
 	return ((void *)uptr);
 }
@@ -164,7 +145,7 @@ queue_again:
 	signsky_atomic_write(&ring->data[slot], (uintptr_t)ptr);
 
 	while (!signsky_atomic_cas_simple(&ring->producer.tail, head, next))
-		ring_cpu_pause();
+		signsky_cpu_pause();
 
 	return (0);
 }

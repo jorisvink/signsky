@@ -90,10 +90,12 @@ static void
 encrypt_drop_access(void)
 {
 	signsky_shm_detach(io->rx);
+	signsky_shm_detach(io->arwin);
 	signsky_shm_detach(io->clear);
 	signsky_shm_detach(io->decrypt);
 
 	io->rx = NULL;
+	io->arwin = NULL;
 	io->clear = NULL;
 	io->decrypt = NULL;
 }

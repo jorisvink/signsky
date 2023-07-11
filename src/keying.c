@@ -111,12 +111,14 @@ signsky_keying_entry(struct signsky_proc *proc)
 static void
 keying_drop_access(void)
 {
+	signsky_shm_detach(io->arwin);
 	signsky_shm_detach(io->clear);
 	signsky_shm_detach(io->crypto);
 	signsky_shm_detach(io->encrypt);
 	signsky_shm_detach(io->decrypt);
 
 	io->clear = NULL;
+	io->arwin = NULL;
 	io->crypto = NULL;
 	io->encrypt = NULL;
 	io->decrypt = NULL;
@@ -206,9 +208,8 @@ keying_install(struct signsky_key *state, u_int32_t spi, void *key, size_t len)
 	PRECOND(key != NULL);
 	PRECOND(len == SIGNSKY_KEY_LENGTH);
 
-	/* XXX */
 	while (signsky_atomic_read(&state->state) != SIGNSKY_KEY_EMPTY)
-		;
+		signsky_cpu_pause();
 
 	if (!signsky_atomic_cas_simple(&state->state,
 	    SIGNSKY_KEY_EMPTY, SIGNSKY_KEY_GENERATING))

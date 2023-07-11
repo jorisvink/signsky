@@ -50,21 +50,6 @@ extern int daemon(int, int);
 /* A few handy macros. */
 #define errno_s		strerror(errno)
 
-#define signsky_atomic_read(x)		\
-    __atomic_load_n(x, __ATOMIC_SEQ_CST)
-
-#define signsky_atomic_write(x, v)	\
-    __atomic_store_n(x, v, __ATOMIC_SEQ_CST)
-
-#define signsky_atomic_cas(x, e, d)	\
-    __atomic_compare_exchange(x, e, d, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
-
-#define signsky_atomic_cas_simple(x, e, d)	\
-    __sync_bool_compare_and_swap(x, e, d)
-
-#define signsky_atomic_add(x, e)	\
-    __atomic_fetch_add(x, e, __ATOMIC_SEQ_CST)
-
 #define PRECOND(x)							\
 	do {								\
 		if (!(x)) {						\
@@ -81,6 +66,44 @@ extern int daemon(int, int);
 		}							\
 	} while (0)
 
+/*
+ * Atomic operations used in signsky.
+ */
+#define signsky_atomic_read(x)		\
+    __atomic_load_n(x, __ATOMIC_SEQ_CST)
+
+#define signsky_atomic_write(x, v)	\
+    __atomic_store_n(x, v, __ATOMIC_SEQ_CST)
+
+#define signsky_atomic_cas(x, e, d)	\
+    __atomic_compare_exchange(x, e, d, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+
+#define signsky_atomic_cas_simple(x, e, d)	\
+    __sync_bool_compare_and_swap(x, e, d)
+
+#define signsky_atomic_add(x, e)	\
+    __atomic_fetch_add(x, e, __ATOMIC_SEQ_CST)
+
+/*
+ * Use architecture specific instructions to hint to the CPU that
+ * we are in a spinloop hopefully avoiding a memory order violation
+ * which would incur a performance hit.
+ */
+#if defined(__arm64__) || defined(__aarch64__)
+#define signsky_cpu_pause()					\
+	do {							\
+		__asm__ volatile("yield" ::: "memory");		\
+	} while (0)
+#elif defined(__x86_64__)
+#define signsky_cpu_pause()					\
+	do {							\
+		__asm__ volatile("pause" ::: "memory");		\
+	} while (0)
+#else
+#error "unsupported architecture"
+#endif
+
+/* Length of our symmetrical keys, in bytes. */
 #define SIGNSKY_KEY_LENGTH		32
 
 /* Process types */
@@ -132,6 +155,17 @@ struct signsky_proc {
 };
 
 /*
+ * The anti-replay window.
+ */
+struct signsky_arwin {
+	volatile int			busy;
+	volatile u_int64_t		last;
+	volatile u_int64_t		bitmap;
+};
+
+#define SIGNSKY_ARWIN_SIZE	64
+
+/*
  * Used to pass all the queues to the clear and crypto sides.
  * Each process is responsible for removing the queues they
  * do not need themselves.
@@ -139,6 +173,7 @@ struct signsky_proc {
 struct signsky_proc_io {
 	struct signsky_key	*tx;
 	struct signsky_key	*rx;
+	struct signsky_arwin	*arwin;
 
 	struct signsky_ring	*clear;
 	struct signsky_ring	*crypto;

@@ -33,6 +33,11 @@ static void	decrypt_keys_install(void);
 static void	decrypt_packet_process(struct signsky_packet *);
 static int	decrypt_with_slot(struct signsky_sa *, struct signsky_packet *);
 
+static int	decrypt_arwin_check(struct signsky_packet *,
+		    struct signsky_ipsec_hdr *);
+static void	decrypt_arwin_update(struct signsky_packet *,
+		    struct signsky_ipsec_hdr *);
+
 /* The local queues. */
 static struct signsky_proc_io	*io = NULL;
 
@@ -143,23 +148,19 @@ decrypt_packet_process(struct signsky_packet *pkt)
 
 	decrypt_keys_install();
 
-	/* We satisfied this earlier, but belts and suspenders. */
 	if (signsky_packet_crypto_checklen(pkt) == -1) {
 		signsky_packet_release(pkt);
 		return;
 	}
 
-	/* Convert relevant fields to host order. */
 	hdr = signsky_packet_head(pkt);
 	hdr->esp.spi = be32toh(hdr->esp.spi);
 	hdr->esp.seq = be32toh(hdr->esp.seq);
 	hdr->pn = be64toh(hdr->pn);
 
-	/* Try decrypting with the SA in slot_1. */
 	if (decrypt_with_slot(&state.slot_1, pkt) != -1)
 		return;
 
-	/* Didn't work, lets try the SA in slot_2. */
 	if (decrypt_with_slot(&state.slot_2, pkt) == -1) {
 		signsky_packet_release(pkt);
 		return;
@@ -167,7 +168,6 @@ decrypt_packet_process(struct signsky_packet *pkt)
 
 	syslog(LOG_NOTICE, "swapping RX SA (spi=0x%08x)", state.slot_2.spi);
 
-	/* We managed with slot_2, so we make slot_2 the primary. */
 	signsky_cipher_cleanup(state.slot_1.cipher);
 
 	state.slot_1.spi = state.slot_2.spi;
@@ -191,36 +191,28 @@ decrypt_with_slot(struct signsky_sa *sa, struct signsky_packet *pkt)
 	PRECOND(sa != NULL);
 	PRECOND(pkt != NULL);
 
-	/* If the SA has no cipher context, don't bother. */
 	if (sa->cipher == NULL)
 		return (-1);
 
-	/* Match SPI. */
 	hdr = signsky_packet_head(pkt);
 	if (hdr->esp.spi != sa->spi)
 		return (-1);
 
-	/* XXX anti-replay check. */
+	if (decrypt_arwin_check(pkt, hdr) == -1)
+		return (-1);
 
-	/* Prepare the nonce and aad. */
 	memcpy(nonce, &sa->salt, sizeof(sa->salt));
 	memcpy(&nonce[sizeof(sa->salt)], &hdr->pn, sizeof(hdr->pn));
 
 	memcpy(aad, &sa->spi, sizeof(sa->spi));
 	memcpy(&aad[sizeof(sa->spi)], &hdr->pn, sizeof(hdr->pn));
 
-	/* Do the cipher dance. */
 	if (signsky_cipher_decrypt(sa->cipher, nonce, sizeof(nonce),
 	    aad, sizeof(aad), pkt) == -1)
 		return (-1);
 
-	/* XXX anti-replay update. */
+	decrypt_arwin_update(pkt, hdr);
 
-	/*
-	 * Since the packet was validated, if the origin was different
-	 * from what we're sending too, update the address we have for
-	 * the peer.
-	 */
 	if (pkt->addr.sin_addr.s_addr != signsky->peer_ip ||
 	    pkt->addr.sin_port != signsky->peer_port) {
 		syslog(LOG_NOTICE, "peer address change (new=%s:%u)",
@@ -231,11 +223,6 @@ decrypt_with_slot(struct signsky_sa *sa, struct signsky_packet *pkt)
 		signsky_atomic_write(&signsky->peer_port, pkt->addr.sin_port);
 	}
 
-	/*
-	 * Packet checks out, remove all overhead for IPSec and the cipher.
-	 * The caller already verified that there was enough data in
-	 * the packet to satisfy the fact that there is a tail and cipher tag.
-	 */
 	pkt->length -= sizeof(struct signsky_ipsec_hdr);
 	pkt->length -= sizeof(struct signsky_ipsec_tail);
 	pkt->length -= signsky_cipher_overhead();
@@ -251,4 +238,28 @@ decrypt_with_slot(struct signsky_sa *sa, struct signsky_packet *pkt)
 		signsky_packet_release(pkt);
 
 	return (0);
+}
+
+/*
+ * Check if the given packet was too old, or already seen.
+ */
+static int
+decrypt_arwin_check(struct signsky_packet *pkt, struct signsky_ipsec_hdr *hdr)
+{
+	PRECOND(pkt != NULL);
+	PRECOND(hdr != NULL);
+
+	return (0);
+}
+
+/*
+ * Update the anti-replay window.
+ */
+static void
+decrypt_arwin_update(struct signsky_packet *pkt, struct signsky_ipsec_hdr *hdr)
+{
+	PRECOND(pkt != NULL);
+	PRECOND(hdr != NULL);
+
+	signsky_atomic_write(&io->arwin->last, hdr->pn);
 }

@@ -35,6 +35,7 @@
 static void	crypto_drop_access(void);
 static void	crypto_recv_packets(int);
 static int	crypto_bind_address(void);
+static int	crypto_arwin_check(struct signsky_packet *);
 static void	crypto_send_packet(int, struct signsky_packet *);
 
 /* Temporary packet for when the packet pool is empty. */
@@ -257,7 +258,7 @@ crypto_recv_packets(int fd)
 		pkt->length = ret;
 		pkt->target = SIGNSKY_PROC_DECRYPT;
 
-		if (signsky_packet_crypto_checklen(pkt) == -1) {
+		if (crypto_arwin_check(pkt) == -1) {
 			signsky_packet_release(pkt);
 			continue;
 		}
@@ -265,4 +266,45 @@ crypto_recv_packets(int fd)
 		if (signsky_ring_queue(io->decrypt, pkt) == -1)
 			signsky_packet_release(pkt);
 	}
+}
+
+/*
+ * Perform the initial anti-replay check before we move it forward
+ * to our decryption process. We only check if the packet falls
+ * inside of the anti-replay window here, the rest is up to
+ * the decryption process.
+ *
+ * We need to account for the fact that the decryption worker could
+ * have up to 1023 queued packets in worst case scenario.
+ */
+static int
+crypto_arwin_check(struct signsky_packet *pkt)
+{
+	u_int32_t			seq;
+	struct signsky_ipsec_hdr	*hdr;
+	u_int64_t			pn, last;
+
+	PRECOND(pkt != NULL);
+
+	if (signsky_packet_crypto_checklen(pkt) == -1)
+		return (-1);
+
+	hdr = signsky_packet_head(pkt);
+	seq = be32toh(hdr->esp.seq);
+	pn = be64toh(hdr->pn);
+
+	if ((pn & 0xffffffff) != seq)
+		return (-1);
+
+	last = signsky_atomic_read(&io->arwin->last);
+
+	if (pn > last)
+		return (0);
+
+	if (pn > 0 && (SIGNSKY_ARWIN_SIZE + 1023) > last - pn)
+		return (0);
+
+	syslog(LOG_INFO, "dropped too old packet (seq=0x%08llx)", pn);
+
+	return (-1);
 }
