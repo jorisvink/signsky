@@ -329,6 +329,7 @@ struct signsky_ring	*signsky_ring_alloc(size_t);
 void	signsky_shm_detach(void *);
 void	signsky_mem_zero(void *, size_t);
 void	*signsky_alloc_shared(size_t, int *);
+int	signsky_unix_socket(const char *, uid_t, gid_t);
 int	signsky_key_install(struct signsky_key *, struct signsky_sa *);
 
 /* platform bits. */

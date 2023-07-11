@@ -16,7 +16,6 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
 #include <sys/un.h>
 
 #include <arpa/inet.h>
@@ -130,37 +129,15 @@ keying_drop_access(void)
 static int
 keying_create_socket(void)
 {
-	struct sockaddr_un	sun;
-	int			fd, flags;
+	int		fd, flags;
 
 	PRECOND(signsky->keying_path != NULL);
 
-	if ((fd = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
-		fatal("socket: %s", errno_s);
-
-	memset(&sun, 0, sizeof(sun));
-	sun.sun_family = AF_UNIX;
-
-	if (strlcpy(sun.sun_path, signsky->keying_path,
-	    sizeof(sun.sun_path)) >= sizeof(sun.sun_path)) {
-		fatal("keying path '%s' didnt fit into sun.sun_path",
-		    signsky->keying_path);
-	}
+	fd = signsky_unix_socket(signsky->keying_path,
+	    signsky->keying_uid, signsky->keying_gid);
 
 	free(signsky->keying_path);
 	signsky->keying_path = NULL;
-
-	if (unlink(sun.sun_path) == -1 && errno != ENOENT)
-		fatal("unlink(%s): %s", sun.sun_path, errno_s);
-
-	if (bind(fd, (const struct sockaddr *)&sun, sizeof(sun)) == -1)
-		fatal("bind(%s): %s", sun.sun_path, errno_s);
-
-	if (chown(sun.sun_path, signsky->keying_uid, signsky->keying_gid) == -1)
-		fatal("chown(%s): %s", sun.sun_path, errno_s);
-
-	if (chmod(sun.sun_path, S_IRWXU) == -1)
-		fatal("chmod(%s): %s", sun.sun_path, errno_s);
 
 	if ((flags = fcntl(fd, F_GETFL, 0)) == -1)
 		fatal("fcntl: %s", errno_s);
