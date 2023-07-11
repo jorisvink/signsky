@@ -48,7 +48,9 @@ process.
 
 ## Traffic
 
-The encrypted traffic is encapsulated with ESP in tunnel mode.
+The encrypted traffic is encapsulated with ESP in tunnel mode, using
+64-bit sequence numbers and encrypted under AES256-GCM using keys
+derived from a shared symmetrical key.
 
 ## Building
 
