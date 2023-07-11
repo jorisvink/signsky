@@ -21,6 +21,7 @@
 #include <arpa/inet.h>
 
 #include <poll.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -245,10 +246,28 @@ decrypt_with_slot(struct signsky_sa *sa, struct signsky_packet *pkt)
 static int
 decrypt_arwin_check(struct signsky_packet *pkt, struct signsky_ipsec_hdr *hdr)
 {
+	u_int64_t	bit;
+
 	PRECOND(pkt != NULL);
 	PRECOND(hdr != NULL);
 
-	return (0);
+	if ((hdr->pn & 0xffffffff) != hdr->esp.seq)
+		return (-1);
+
+	if (hdr->pn > io->arwin->last)
+		return (0);
+
+	if (hdr->pn > 0 && SIGNSKY_ARWIN_SIZE > io->arwin->last - hdr->pn) {
+		bit = (SIGNSKY_ARWIN_SIZE - 1) - (io->arwin->last - hdr->pn);
+		if (io->arwin->bitmap & ((u_int64_t)1 << bit)) {
+			syslog(LOG_INFO,
+			    "packet seq=0x%" PRIx64 " already seen", hdr->pn);
+			return (-1);
+		}
+		return (0);
+	}
+
+	return (-1);
 }
 
 /*
@@ -257,8 +276,26 @@ decrypt_arwin_check(struct signsky_packet *pkt, struct signsky_ipsec_hdr *hdr)
 static void
 decrypt_arwin_update(struct signsky_packet *pkt, struct signsky_ipsec_hdr *hdr)
 {
+	u_int64_t	bit;
+
 	PRECOND(pkt != NULL);
 	PRECOND(hdr != NULL);
 
-	signsky_atomic_write(&io->arwin->last, hdr->pn);
+	if (hdr->pn > io->arwin->last) {
+		if (hdr->pn - io->arwin->last >= SIGNSKY_ARWIN_SIZE) {
+			io->arwin->bitmap = ((u_int64_t)1 << 63);
+		} else {
+			io->arwin->bitmap >>= (hdr->pn - io->arwin->last);
+			io->arwin->bitmap |= ((u_int64_t)1 << 63);
+		}
+
+		signsky_atomic_write(&io->arwin->last, hdr->pn);
+		return;
+	}
+
+	if (io->arwin->last < hdr->pn)
+		fatal("%s: window corrupt", __func__);
+
+	bit = (SIGNSKY_ARWIN_SIZE - 1) - (io->arwin->last - hdr->pn);
+	io->arwin->bitmap |= ((u_int64_t)1 << bit);
 }

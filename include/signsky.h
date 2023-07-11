@@ -158,8 +158,8 @@ struct signsky_proc {
  * The anti-replay window.
  */
 struct signsky_arwin {
-	volatile u_int64_t		last;
-	volatile u_int64_t		bitmap;
+	volatile u_int64_t	last;
+	u_int64_t		bitmap;
 };
 
 #define SIGNSKY_ARWIN_SIZE	64
