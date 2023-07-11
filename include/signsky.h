@@ -266,7 +266,7 @@ struct signsky_state {
 	volatile u_int16_t	peer_port;
 
 	/* The users the different processes runas. */
-	const char		*runas[SIGNSKY_PROC_MAX];
+	char			*runas[SIGNSKY_PROC_MAX];
 
 	/* The keying socket path and its owner. */
 	uid_t			keying_uid;
