@@ -134,19 +134,14 @@ static void
 decrypt_packet_process(struct signsky_packet *pkt)
 {
 	struct signsky_ipsec_hdr	*hdr;
-	size_t				minlen;
 
 	PRECOND(pkt != NULL);
 	PRECOND(pkt->target == SIGNSKY_PROC_DECRYPT);
 
 	decrypt_keys_install();
 
-	/* Belts and suspenders. */
-	minlen = sizeof(struct signsky_ipsec_hdr) +
-	    sizeof(struct signsky_ipsec_tail) +
-	    signsky_cipher_overhead();
-
-	if (pkt->length < minlen) {
+	/* We satisfied this earlier, but belts and suspenders. */
+	if (signsky_packet_crypto_checklen(pkt) == -1) {
 		signsky_packet_release(pkt);
 		return;
 	}

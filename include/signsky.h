@@ -257,6 +257,7 @@ struct signsky_proc	*signsky_process(void);
 /* src/packet.c */
 void	signsky_packet_init(void);
 void	signsky_packet_release(struct signsky_packet *);
+int	signsky_packet_crypto_checklen(struct signsky_packet *);
 
 void	*signsky_packet_info(struct signsky_packet *);
 void	*signsky_packet_data(struct signsky_packet *);

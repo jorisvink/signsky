@@ -101,3 +101,19 @@ signsky_packet_tail(struct signsky_packet *pkt)
 
 	return (&pkt->buf[SIGNSKY_PACKET_HEAD_LEN + pkt->length]);
 }
+
+/*
+ * Check if the given packet contains enough data to satisfy
+ * an IPSec header, tail and cipher overhead.
+ */
+int
+signsky_packet_crypto_checklen(struct signsky_packet *pkt)
+{
+	PRECOND(pkt != NULL);
+
+	if (pkt->length < sizeof(struct signsky_ipsec_hdr) +
+	    sizeof(struct signsky_ipsec_tail) + signsky_cipher_overhead())
+		return (-1);
+
+	return (0);
+}

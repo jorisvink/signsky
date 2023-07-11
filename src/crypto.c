@@ -241,6 +241,11 @@ crypto_recv_packets(int fd)
 		pkt->length = ret;
 		pkt->target = SIGNSKY_PROC_DECRYPT;
 
+		if (signsky_packet_crypto_checklen(pkt) == -1) {
+			signsky_packet_release(pkt);
+			continue;
+		}
+
 		if (signsky_ring_queue(io->decrypt, pkt) == -1)
 			signsky_packet_release(pkt);
 	}
