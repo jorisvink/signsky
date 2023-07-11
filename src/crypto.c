@@ -22,6 +22,7 @@
 
 #include <poll.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -304,7 +305,7 @@ crypto_arwin_check(struct signsky_packet *pkt)
 	if (pn > 0 && (SIGNSKY_ARWIN_SIZE + 1023) > last - pn)
 		return (0);
 
-	syslog(LOG_INFO, "dropped too old packet (seq=0x%08llx)", pn);
+	syslog(LOG_INFO, "dropped too old packet, seq=0x%" PRIx64, pn);
 
 	return (-1);
 }
