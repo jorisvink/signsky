@@ -25,7 +25,6 @@
 #include "signsky.h"
 
 static void	signal_hdlr(int);
-
 static void	usage(void) __attribute__((noreturn));
 
 static int			early = 1;
@@ -76,7 +75,7 @@ main(int argc, char *argv[])
 	signsky_signal_trap(SIGCHLD);
 	signsky_signal_trap(SIGQUIT);
 
-	signsky_proc_init();
+	signsky_proc_init(argv);
 	signsky_packet_init();
 	signsky_proc_start();
 

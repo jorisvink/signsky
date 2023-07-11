@@ -27,29 +27,54 @@
 
 #include "signsky.h"
 
+static void	proc_title(const char *);
+
 /* List of all worker processes. */
 static LIST_HEAD(, signsky_proc)		proclist;
 
 /* Some human understand process types. */
 static const char *proctab[] = {
 	"unknown",
-	"signsky-clear",
-	"signsky-crypto",
-	"signsky-encrypt",
-	"signsky-decrypt",
-	"signsky-keying"
+	"clear",
+	"crypto",
+	"encrypt",
+	"decrypt",
+	"keying"
 };
 
 /* Points to the process its own signsky_proc, or NULL or parent. */
 static struct signsky_proc	*process = NULL;
 
+/* Used for setting the process titles. */
+static size_t		proc_title_max = 0;
+static char		**proc_argv = NULL;
+extern char		**environ;
+
 /*
  * Initialize the process system so new processes can be started.
  */
 void
-signsky_proc_init(void)
+signsky_proc_init(char **argv)
 {
+	int		i;
+	char		*p;
+
+	PRECOND(argv != NULL);
+
 	LIST_INIT(&proclist);
+
+	proc_argv = argv;
+	proc_title_max = 0;
+
+	for (i = 0; environ[i] != NULL; i++) {
+		if ((p = strdup(environ[i])) == NULL)
+			fatal("strdup");
+		proc_title_max += strlen(environ[i]) + 1;
+		environ[i] = p;
+	}
+
+	for (i = 0; proc_argv[i] != NULL; i++)
+		proc_title_max += strlen(proc_argv[i]) + 1;
 }
 
 /*
@@ -128,6 +153,7 @@ signsky_proc_create(u_int16_t type,
 
 	if (proc->pid == 0) {
 		openlog(proc->name, LOG_NDELAY | LOG_PID, LOG_DAEMON);
+		proc_title(proc->name);
 
 		process = proc;
 		proc->pid = getpid(),
@@ -236,4 +262,23 @@ struct signsky_proc *
 signsky_process(void)
 {
 	return (process);
+}
+
+/*
+ * Set a process title by overwriting the argv[] arguments.
+ */
+static void
+proc_title(const char *name)
+{
+	int	len;
+
+	PRECOND(name != NULL);
+
+	proc_argv[1] = NULL;
+
+	len = snprintf(proc_argv[0], proc_title_max, "signsky [%s]", name);
+	if (len == -1 || (size_t)len >= proc_title_max)
+		fatal("proctitle 'signsky-%s' too large", name);
+
+	memset(proc_argv[0] + len, 0, proc_title_max - len);
 }

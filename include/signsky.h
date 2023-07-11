@@ -282,10 +282,10 @@ void	fatal(const char *, ...) __attribute__((format (printf, 1, 2)))
 	    __attribute__((noreturn));
 
 /* src/proc. */
-void	signsky_proc_init(void);
 void	signsky_proc_reap(void);
 void	signsky_proc_start(void);
 void	signsky_proc_killall(int);
+void	signsky_proc_init(char **);
 void	signsky_proc_shutdown(void);
 void	signsky_proc_privsep(struct signsky_proc *);
 void	signsky_proc_create(u_int16_t,
