@@ -68,6 +68,8 @@ main(int argc, char *argv[])
 		usage();
 
 	signsky = signsky_alloc_shared(sizeof(*signsky), NULL);
+
+	signsky_config_init();
 	signsky_config_load(config);
 
 	signsky_signal_trap(SIGINT);

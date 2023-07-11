@@ -254,6 +254,16 @@ struct signsky_packet {
 };
 
 /*
+ * A configuration for a UNIX socket, where it gets
+ * created, who owns it etc.
+ */
+struct signsky_sun {
+	uid_t		uid;
+	gid_t		gid;
+	char		path[256];		/* XXX */
+};
+
+/*
  * The shared state between processes.
  */
 struct signsky_state {
@@ -268,15 +278,17 @@ struct signsky_state {
 	/* The users the different processes runas. */
 	char			*runas[SIGNSKY_PROC_MAX];
 
-	/* The keying socket path and its owner. */
-	uid_t			keying_uid;
-	gid_t			keying_gid;
-	char			*keying_path;
+	/* The keying socket. */
+	struct signsky_sun	keying;
+
+	/* The status socket. */
+	struct signsky_sun	status;
 };
 
 extern struct signsky_state	*signsky;
 
 /* src/config.c */
+void	signsky_config_init(void);
 void	signsky_config_load(const char *);
 
 /* src/signsky.c */
@@ -329,7 +341,7 @@ struct signsky_ring	*signsky_ring_alloc(size_t);
 void	signsky_shm_detach(void *);
 void	signsky_mem_zero(void *, size_t);
 void	*signsky_alloc_shared(size_t, int *);
-int	signsky_unix_socket(const char *, uid_t, gid_t);
+int	signsky_unix_socket(struct signsky_sun *);
 int	signsky_key_install(struct signsky_key *, struct signsky_sa *);
 
 /* platform bits. */

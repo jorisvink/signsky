@@ -35,8 +35,12 @@ static void	config_parse_peer(char *);
 static void	config_parse_local(char *);
 static void	config_parse_runas(char *);
 static void	config_parse_keying(char *);
+static void	config_parse_status(char *);
 static void	config_parse_host(char *, struct sockaddr_in *);
+static void	config_parse_unix(char *, struct signsky_sun *);
 
+static void	config_unix_set(struct signsky_sun *,
+		    const char *, const char *);
 static char	*config_read_line(FILE *, char *, size_t);
 
 static const struct {
@@ -47,6 +51,7 @@ static const struct {
 	{ "local",		config_parse_local },
 	{ "run",		config_parse_runas },
 	{ "keying",		config_parse_keying },
+	{ "status",		config_parse_status },
 	{ NULL,			NULL },
 };
 
@@ -63,6 +68,15 @@ static const struct {
 };
 
 void
+signsky_config_init(void)
+{
+	PRECOND(signsky != NULL);
+
+	config_unix_set(&signsky->status, "/tmp/signsky-status", "root");
+	config_unix_set(&signsky->keying, "/tmp/signsky-keying", "root");
+}
+
+void
 signsky_config_load(const char *file)
 {
 	FILE		*fp;
@@ -70,6 +84,7 @@ signsky_config_load(const char *file)
 	char		buf[BUFSIZ], *option, *value;
 
 	PRECOND(file != NULL);
+	PRECOND(signsky != NULL);
 
 	if ((fp = fopen(file, "r")) == NULL)
 		fatal("failed to open '%s': %s", file, errno_s);
@@ -98,9 +113,6 @@ signsky_config_load(const char *file)
 		fatal("error reading the configuration file");
 
 	fclose(fp);
-
-	if (signsky->keying_path == NULL)
-		fatal("no keying path was given, this is not optional");
 }
 
 static char *
@@ -187,24 +199,54 @@ config_parse_runas(char *runas)
 static void
 config_parse_keying(char *path)
 {
-	struct passwd	*pw;
+	PRECOND(path != NULL);
+
+	config_parse_unix(path, &signsky->keying);
+}
+
+static void
+config_parse_status(char *path)
+{
+	PRECOND(path != NULL);
+
+	config_parse_unix(path, &signsky->status);
+}
+
+static void
+config_parse_unix(char *path, struct signsky_sun *sun)
+{
 	char		*owner;
 
 	PRECOND(path != NULL);
+	PRECOND(sun != NULL);
 
 	if ((owner = strrchr(path, ' ')) == NULL)
-		fatal("option 'keying %s' invalid", path);
+		fatal("option '%s' invalid", path);
 
 	*(owner)++ = '\0';
+
+	config_unix_set(sun, path, owner);
+}
+
+static void
+config_unix_set(struct signsky_sun *sun, const char *path, const char *owner)
+{
+	int		len;
+	struct passwd	*pw;
+
+	PRECOND(sun != NULL);
+	PRECOND(path != NULL);
+	PRECOND(owner != NULL);
 
 	if ((pw = getpwnam(owner)) == NULL)
 		fatal("user '%s' does not exist", owner);
 
-	if ((signsky->keying_path = strdup(path)) == NULL)
-		fatal("strdup failed");
+	len = snprintf(sun->path, sizeof(sun->path), "%s", path);
+	if (len == -1 || (size_t)len >= sizeof(sun->path))
+		fatal("path '%s' too long", path);
 
-	signsky->keying_uid = pw->pw_uid;
-	signsky->keying_gid = pw->pw_gid;
+	sun->uid = pw->pw_uid;
+	sun->gid = pw->pw_gid;
 }
 
 static void

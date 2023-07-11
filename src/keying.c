@@ -131,13 +131,7 @@ keying_create_socket(void)
 {
 	int		fd, flags;
 
-	PRECOND(signsky->keying_path != NULL);
-
-	fd = signsky_unix_socket(signsky->keying_path,
-	    signsky->keying_uid, signsky->keying_gid);
-
-	free(signsky->keying_path);
-	signsky->keying_path = NULL;
+	fd = signsky_unix_socket(&signsky->keying);
 
 	if ((flags = fcntl(fd, F_GETFL, 0)) == -1)
 		fatal("fcntl: %s", errno_s);

@@ -62,12 +62,12 @@ signsky_key_install(struct signsky_key *key, struct signsky_sa *sa)
  * uid and gid and with 0700 permissions.
  */
 int
-signsky_unix_socket(const char *path, uid_t uid, gid_t gid)
+signsky_unix_socket(struct signsky_sun *cfg)
 {
 	struct sockaddr_un	sun;
 	int			fd, len;
 
-	PRECOND(path != NULL);
+	PRECOND(cfg != NULL);
 
 	if ((fd = socket(AF_UNIX, SOCK_DGRAM, 0)) == -1)
 		fatal("socket: %s", errno_s);
@@ -75,9 +75,9 @@ signsky_unix_socket(const char *path, uid_t uid, gid_t gid)
 	memset(&sun, 0, sizeof(sun));
 	sun.sun_family = AF_UNIX;
 
-	len = snprintf(sun.sun_path, sizeof(sun.sun_path), "%s", path);
+	len = snprintf(sun.sun_path, sizeof(sun.sun_path), "%s", cfg->path);
 	if (len == -1 || (size_t)len >= sizeof(sun.sun_path))
-		fatal("path '%s' didnt fit into sun.sun_path", path);
+		fatal("path '%s' didnt fit into sun.sun_path", cfg->path);
 
 	if (unlink(sun.sun_path) == -1 && errno != ENOENT)
 		fatal("unlink(%s): %s", sun.sun_path, errno_s);
@@ -85,7 +85,7 @@ signsky_unix_socket(const char *path, uid_t uid, gid_t gid)
 	if (bind(fd, (const struct sockaddr *)&sun, sizeof(sun)) == -1)
 		fatal("bind(%s): %s", sun.sun_path, errno_s);
 
-	if (chown(sun.sun_path, uid, gid) == -1)
+	if (chown(sun.sun_path, cfg->uid, cfg->gid) == -1)
 		fatal("chown(%s): %s", sun.sun_path, errno_s);
 
 	if (chmod(sun.sun_path, S_IRWXU) == -1)
