@@ -284,6 +284,9 @@ struct signsky_state {
 
 	/* The status socket. */
 	struct signsky_sun	status;
+
+	/* The signsky instance name. */
+	char			instance[16];	/* XXX */
 };
 
 extern struct signsky_state	*signsky;

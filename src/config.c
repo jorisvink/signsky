@@ -36,6 +36,7 @@ static void	config_parse_local(char *);
 static void	config_parse_runas(char *);
 static void	config_parse_keying(char *);
 static void	config_parse_status(char *);
+static void	config_parse_instance(char *);
 static void	config_parse_host(char *, struct sockaddr_in *);
 static void	config_parse_unix(char *, struct signsky_sun *);
 
@@ -52,6 +53,7 @@ static const struct {
 	{ "run",		config_parse_runas },
 	{ "keying",		config_parse_keying },
 	{ "status",		config_parse_status },
+	{ "instance",		config_parse_instance },
 	{ NULL,			NULL },
 };
 
@@ -211,6 +213,18 @@ config_parse_status(char *path)
 	PRECOND(path != NULL);
 
 	config_parse_unix(path, &signsky->status);
+}
+
+static void
+config_parse_instance(char *opt)
+{
+	int		len;
+
+	PRECOND(opt != NULL);
+
+	len = snprintf(signsky->instance, sizeof(signsky->instance), "%s", opt);
+	if (len == -1 || (size_t)len >= sizeof(signsky->instance))
+		fatal("instance name '%s' too long", opt);
 }
 
 static void

@@ -279,7 +279,14 @@ signsky_proc_title(const char *name)
 
 	proc_argv[1] = NULL;
 
-	len = snprintf(proc_argv[0], proc_title_max, "signsky [%s]", name);
+	if (signsky->instance[0] != '\0') {
+		len = snprintf(proc_argv[0], proc_title_max,
+		    "%s [%s]", signsky->instance, name);
+	} else {
+		len = snprintf(proc_argv[0], proc_title_max,
+		    "signsky [%s]", name);
+	}
+
 	if (len == -1 || (size_t)len >= proc_title_max)
 		fatal("proctitle 'signsky-%s' too large", name);
 
