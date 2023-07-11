@@ -22,12 +22,18 @@ signsky consists of 5 processes:
 | crypto | the process receiving and sending packets on the outer interface.
 
 Each process can run as its own user.
+
+Each process is sandboxed and only has access to the system calls
+required to perform its task.
+
+## Packets
+
 The processes share packets between each other in a very well defined way.
 
 For incoming packets:
 
 ```
-crypto -> -> decrypt -> clear
+crypto -> decrypt -> clear
 ```
 
 For outgoing packets:
@@ -36,8 +42,9 @@ For outgoing packets:
 clear -> encrypt -> crypto
 ```
 
-Each process is sandboxed and only has access to the system calls
-required to perform its task.
+Due to the design of signsky it is impossible to move a packet straight
+from the clear side to the crypto side without passing the encryption
+process.
 
 ## Traffic
 
