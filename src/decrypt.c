@@ -17,6 +17,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -212,7 +215,21 @@ decrypt_with_slot(struct signsky_sa *sa, struct signsky_packet *pkt)
 		return (-1);
 
 	/* XXX anti-replay update. */
-	/* XXX Update the remote address if needed. */
+
+	/*
+	 * Since the packet was validated, if the origin was different
+	 * from what we're sending too, update the address we have for
+	 * the peer.
+	 */
+	if (pkt->addr.sin_addr.s_addr != signsky->peer_ip ||
+	    pkt->addr.sin_port != signsky->peer_port) {
+		syslog(LOG_NOTICE, "peer address change (new=%s:%u)",
+		    inet_ntoa(pkt->addr.sin_addr), ntohs(pkt->addr.sin_port));
+
+		signsky_atomic_write(&signsky->peer_ip,
+		    pkt->addr.sin_addr.s_addr);
+		signsky_atomic_write(&signsky->peer_port, pkt->addr.sin_port);
+	}
 
 	/*
 	 * Packet checks out, remove all overhead for IPSec and the cipher.

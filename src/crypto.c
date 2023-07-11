@@ -167,20 +167,29 @@ static void
 crypto_send_packet(int fd, struct signsky_packet *pkt)
 {
 	ssize_t			ret;
+	struct sockaddr_in	peer;
 	u_int8_t		*data;
 
 	PRECOND(fd >= 0);
 	PRECOND(pkt != NULL);
 	PRECOND(pkt->target == SIGNSKY_PROC_CRYPTO);
 
+	peer.sin_family = AF_INET;
+	peer.sin_port = signsky_atomic_read(&signsky->peer_port);
+	peer.sin_addr.s_addr = signsky_atomic_read(&signsky->peer_ip);
+
+	if (peer.sin_addr.s_addr == 0) {
+		signsky_packet_release(pkt);
+		return;
+	}
+
 	for (;;) {
 		data = signsky_packet_head(pkt);
 
 		if ((ret = sendto(fd, data, pkt->length, 0,
-		    (struct sockaddr *)&signsky->peer,
-		    sizeof(signsky->peer))) == -1) {
+		    (struct sockaddr *)&peer, sizeof(peer))) == -1) {
 			if (errno == EINTR)
-				break;
+				continue;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				break;
 			if (errno == ENETUNREACH || errno == EHOSTUNREACH) {
@@ -208,7 +217,6 @@ crypto_recv_packets(int fd)
 	int			idx;
 	ssize_t			ret;
 	struct signsky_packet	*pkt;
-	struct sockaddr_in	peer;
 	u_int8_t		*data;
 	socklen_t		socklen;
 
@@ -218,14 +226,16 @@ crypto_recv_packets(int fd)
 		if ((pkt = signsky_packet_get()) == NULL)
 			pkt = &tpkt;
 
-		socklen = sizeof(peer);
+		socklen = sizeof(pkt->addr);
 		data = signsky_packet_head(pkt);
 
 		if ((ret = recvfrom(fd, data, SIGNSKY_PACKET_DATA_LEN, 0,
-		    (struct sockaddr *)&peer, &socklen)) == -1) {
+		    (struct sockaddr *)&pkt->addr, &socklen)) == -1) {
 			if (pkt != &tpkt)
 				signsky_packet_release(pkt);
-			if (errno == EINTR || errno == EIO)
+			if (errno == EINTR)
+				continue;
+			if (errno == EIO)
 				break;
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				break;

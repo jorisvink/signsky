@@ -50,8 +50,7 @@ signsky_packet_get(void)
 	if ((pkt = signsky_pool_get(pktpool)) == NULL)
 		return (NULL);
 
-	pkt->length = 0;
-	pkt->target = 0;
+	signsky_mem_zero(pkt, sizeof(*pkt));
 
 	return (pkt);
 }

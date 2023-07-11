@@ -213,9 +213,10 @@ struct signsky_ipsec_tail {
  * A network packet.
  */
 struct signsky_packet {
-	size_t		length;
-	u_int32_t	target;
-	u_int8_t	buf[SIGNSKY_PACKET_MAX_LEN];
+	struct sockaddr_in	addr;
+	size_t			length;
+	u_int32_t		target;
+	u_int8_t		buf[SIGNSKY_PACKET_MAX_LEN];
 };
 
 /*
@@ -225,6 +226,10 @@ struct signsky_state {
 	/* Local and remote addresses. */
 	struct sockaddr_in	peer;
 	struct sockaddr_in	local;
+
+	/* The actual peer ip and port. */
+	volatile u_int32_t	peer_ip;
+	volatile u_int16_t	peer_port;
 
 	/* The users the different processes runas. */
 	const char		*runas[SIGNSKY_PROC_MAX];

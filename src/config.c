@@ -133,6 +133,9 @@ config_parse_peer(char *peer)
 	PRECOND(peer != NULL);
 
 	config_parse_host(peer, &signsky->peer);
+
+	signsky_atomic_write(&signsky->peer_port, signsky->peer.sin_port);
+	signsky_atomic_write(&signsky->peer_ip, signsky->peer.sin_addr.s_addr);
 }
 
 static void
