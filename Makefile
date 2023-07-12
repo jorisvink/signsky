@@ -35,7 +35,11 @@ LDFLAGS+=-fsanitize=address,undefined
 ifeq ("$(CIPHER)", "openssl-aes-gcm")
 	CFLAGS+=$(shell pkg-config openssl --cflags)
 	LDFLAGS+=$(shell pkg-config openssl --libs)
-	SRC+=src/cipher_aes_gcm.c
+	SRC+=src/openssl_aes_gcm.c
+else ifeq ("$(CIPHER)", "intel-aes-gcm")
+	CFLAGS+=$(shell pkg-config libisal_crypto --cflags)
+	LDFLAGS+=$(shell pkg-config libisal_crypto --libs)
+	SRC+=src/intel_aes_gcm.c
 else
 $(error "No CIPHER selected")
 endif
