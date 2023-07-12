@@ -14,7 +14,7 @@ class Negotiate:
         sock = kore.socket_wrap(s)
 
         data = struct.pack("=II32s", 0xdeadbeef, 0xcafebabe, b"\x00" * 32)
-        await sock.sendto("/tmp/signsky.key", data)
+        await sock.sendto("/tmp/signsky-keying", data)
         kore.shutdown()
 
 koreapp = Negotiate()
