@@ -44,10 +44,7 @@ union deconst {
 };
 
 /*
- * Setup the AES-GCM cipher by running key expansion first on the
- * given AES key.
- *
- * Then initialising a GCM128_CONTEXT with said key.
+ * Setup the cipher.
  */
 void *
 signsky_cipher_setup(struct signsky_key *key)
@@ -142,7 +139,7 @@ signsky_cipher_decrypt(void *arg, const void *nonce, size_t nonce_len,
 }
 
 /*
- * Cleanup the AES-GCM cipher states.
+ * Cleanup the cipher states.
  */
 void
 signsky_cipher_cleanup(void *arg)
