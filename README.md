@@ -52,6 +52,13 @@ The encrypted traffic is encapsulated with ESP in tunnel mode, using
 64-bit sequence numbers and encrypted under AES256-GCM using keys
 derived from a shared symmetrical key.
 
+## High performance mode
+
+When signsky is built with the CIPHER=intel-aes-gcm and HPERF=1,
+high performance mode is enabled.
+
+In this mode, signsky is able to reach 10gbps speeds, depending on hardware.
+
 ## Building
 
 TODO
