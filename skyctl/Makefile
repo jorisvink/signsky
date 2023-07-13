@@ -15,6 +15,11 @@ CFLAGS+=-Wpointer-arith -Wcast-qual -Wsign-compare -O2
 CFLAGS+=-fstack-protector-all -Wtype-limits -fno-common -I../include
 CFLAGS+=-g
 
+OSNAME=$(shell uname -s | sed -e 's/[-_].*//g' | tr A-Z a-z)
+ifeq ("$(OSNAME)", "linux")
+	CFLAGS+=-D_GNU_SOURCE=1 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2
+endif
+
 OBJS=	$(SRC:../src/%.c=$(OBJDIR)/%.o)
 
 $(BIN): $(OBJDIR) $(OBJS)
