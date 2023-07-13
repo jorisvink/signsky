@@ -209,6 +209,9 @@ crypto_send_packet(int fd, struct signsky_packet *pkt)
 			fatal("sendto: %s", errno_s);
 		}
 
+		signsky_atomic_add(&signsky->tx.pkt, 1);
+		signsky_atomic_add(&signsky->tx.bytes, pkt->length);
+		signsky_atomic_write(&signsky->tx.last, signsky->uptime);
 		break;
 	}
 
@@ -266,6 +269,7 @@ crypto_recv_packets(int fd)
 
 		if (signsky_ring_queue(io->decrypt, pkt) == -1)
 			signsky_packet_release(pkt);
+
 	}
 }
 

@@ -121,6 +121,8 @@ decrypt_keys_install(void)
 {
 	if (state.slot_1.cipher == NULL) {
 		if (signsky_key_install(io->rx, &state.slot_1) != -1) {
+			signsky_atomic_write(&signsky->rx.spi,
+			    state.slot_1.spi);
 			syslog(LOG_NOTICE, "new RX SA (spi=0x%08x)",
 			    state.slot_1.spi);
 		}
@@ -167,6 +169,7 @@ decrypt_packet_process(struct signsky_packet *pkt)
 		return;
 	}
 
+	signsky_atomic_write(&signsky->rx.spi, state.slot_2.spi);
 	syslog(LOG_NOTICE, "swapping RX SA (spi=0x%08x)", state.slot_2.spi);
 
 	signsky_cipher_cleanup(state.slot_1.cipher);

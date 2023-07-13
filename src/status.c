@@ -26,16 +26,8 @@
 
 #include "signsky.h"
 
-#define STATUS_REQUEST_DUMP		1
-
 static void	status_handle_request(int);
-
-/*
- * How a status request looks like on the wire.
- */
-struct request {
-	u_int8_t	cmd;
-} __attribute__((packed));
+static void	status_request(int, struct sockaddr_un *);
 
 /*
  * The status process, handles incoming status requests.
@@ -91,10 +83,10 @@ signsky_status_entry(struct signsky_proc *proc)
 static void
 status_handle_request(int fd)
 {
-	ssize_t			ret;
-	struct request		req;
-	struct sockaddr_un	peer;
-	socklen_t		socklen;
+	ssize_t				ret;
+	struct signsky_ctl_status	req;
+	struct sockaddr_un		peer;
+	socklen_t			socklen;
 
 	PRECOND(fd >= 0);
 
@@ -114,6 +106,40 @@ status_handle_request(int fd)
 		if ((size_t)ret != sizeof(req))
 			break;
 
+		switch (req.cmd) {
+		case SIGNSKY_CTL_STATUS:
+			status_request(fd, &peer);
+			break;
+		}
+
 		break;
 	}
+}
+
+/*
+ * Send some generic statistics to the client.
+ */
+static void
+status_request(int fd, struct sockaddr_un *peer)
+{
+	struct signsky_ctl_status_response	resp;
+
+	PRECOND(fd >= 0);
+	PRECOND(peer != NULL);
+
+	memset(&resp, 0, sizeof(resp));
+
+	resp.tx.spi = signsky_atomic_read(&signsky->tx.spi);
+	resp.tx.pkt = signsky_atomic_read(&signsky->tx.pkt);
+	resp.tx.last = signsky_atomic_read(&signsky->tx.last);
+	resp.tx.bytes = signsky_atomic_read(&signsky->tx.bytes);
+
+	resp.rx.spi = signsky_atomic_read(&signsky->rx.spi);
+	resp.rx.pkt = signsky_atomic_read(&signsky->rx.pkt);
+	resp.rx.last = signsky_atomic_read(&signsky->rx.last);
+	resp.rx.bytes = signsky_atomic_read(&signsky->rx.bytes);
+
+	if (sendto(fd, &resp, sizeof(resp), 0,
+	    (const struct sockaddr *)peer, sizeof(*peer)) == -1)
+		fatal("failed to send status to peer: %s", errno_s);
 }

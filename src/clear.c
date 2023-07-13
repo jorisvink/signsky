@@ -140,6 +140,10 @@ clear_send_packet(int fd, struct signsky_packet *pkt)
 			fatal("%s: write(): %s", __func__, errno_s);
 		}
 
+		signsky_atomic_add(&signsky->rx.pkt, 1);
+		signsky_atomic_add(&signsky->rx.bytes, pkt->length);
+		signsky_atomic_write(&signsky->rx.last, signsky->uptime);
+
 		break;
 	}
 

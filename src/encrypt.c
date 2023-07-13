@@ -68,6 +68,7 @@ signsky_encrypt_entry(struct signsky_proc *proc)
 		}
 
 		if (signsky_key_install(io->tx, &state) != -1) {
+			signsky_atomic_write(&signsky->tx.spi, state.spi);
 			syslog(LOG_NOTICE, "new TX SA (spi=0x%08x)",
 			    state.spi);
 		}
@@ -115,8 +116,10 @@ encrypt_packet_process(struct signsky_packet *pkt)
 	PRECOND(pkt->target == SIGNSKY_PROC_ENCRYPT);
 
 	/* Install any pending TX key first. */
-	if (signsky_key_install(io->tx, &state) != -1)
+	if (signsky_key_install(io->tx, &state) != -1) {
+		signsky_atomic_write(&signsky->tx.spi, state.spi);
 		syslog(LOG_NOTICE, "new TX SA (spi=0x%08x)", state.spi);
+	}
 
 	/* If we don't have a cipher state, we shall not submit. */
 	if (state.cipher == NULL) {

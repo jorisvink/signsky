@@ -57,6 +57,9 @@ endif
 
 OBJS=	$(SRC:src/%.c=$(OBJDIR)/%.o)
 
+all: $(BIN)
+	$(MAKE) -C skyctl
+
 $(BIN): $(OBJDIR) $(OBJS)
 	$(CC) $(OBJS) $(LDFLAGS) -o $(BIN)
 
@@ -70,4 +73,5 @@ $(OBJDIR)/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
+	$(MAKE) -C skyctl clean
 	rm -rf $(OBJDIR) $(BIN)

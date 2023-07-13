@@ -20,6 +20,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <signal.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "signsky.h"
@@ -45,8 +46,9 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
-	const char	*config;
-	int		ch, running, sig, foreground;
+	struct timespec		ts;
+	const char		*config;
+	int			ch, running, sig, foreground;
 
 	config = NULL;
 	foreground = 1;
@@ -112,7 +114,9 @@ main(int argc, char *argv[])
 			}
 		}
 
-		/* Parent ain't doing much for now. */
+		(void)clock_gettime(CLOCK_MONOTONIC, &ts);
+		signsky_atomic_write(&signsky->uptime, ts.tv_sec);
+
 		sleep(1);
 	}
 

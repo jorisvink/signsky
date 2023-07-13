@@ -47,6 +47,8 @@ extern int daemon(int, int);
 #define be64toh(x)		OSSwapBigToHostInt64(x)
 #endif
 
+#include "signsky_ctl.h"
+
 /* A few handy macros. */
 #define errno_s		strerror(errno)
 
@@ -268,6 +270,9 @@ struct signsky_sun {
  * The shared state between processes.
  */
 struct signsky_state {
+	/* Time maintained by overwatch. */
+	volatile u_int64_t	uptime;
+
 	/* Local and remote addresses. */
 	struct sockaddr_in	peer;
 	struct sockaddr_in	local;
@@ -287,6 +292,10 @@ struct signsky_state {
 
 	/* The signsky instance name. */
 	char			instance[16];	/* XXX */
+
+	/* Tx and Rx statistics. */
+	struct signsky_ifstat	tx;
+	struct signsky_ifstat	rx;
 };
 
 extern struct signsky_state	*signsky;
