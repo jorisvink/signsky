@@ -119,7 +119,7 @@ skyctl_request_status(void)
 	struct signsky_ctl_status		req;
 	struct signsky_ctl_status_response	resp;
 
-	fd = skyctl_socket_local("/tmp/signsky-status");
+	fd = skyctl_socket_local("/tmp/skyctl-status");
 
 	memset(&req, 0, sizeof(req));
 
