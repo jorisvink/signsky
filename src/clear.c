@@ -88,7 +88,7 @@ signsky_clear_entry(struct signsky_proc *proc)
 			clear_send_packet(fd, pkt);
 
 #if !defined(SIGNSKY_HIGH_PERFORMANCE)
-		usleep(10);
+		usleep(500);
 #endif
 	}
 

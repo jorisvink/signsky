@@ -97,7 +97,7 @@ signsky_crypto_entry(struct signsky_proc *proc)
 			crypto_send_packet(fd, pkt);
 
 #if !defined(SIGNSKY_HIGH_PERFORMANCE)
-		usleep(10);
+		usleep(500);
 #endif
 	}
 

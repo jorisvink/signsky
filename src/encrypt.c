@@ -77,7 +77,7 @@ signsky_encrypt_entry(struct signsky_proc *proc)
 			encrypt_packet_process(pkt);
 
 #if !defined(SIGNSKY_HIGH_PERFORMANCE)
-		usleep(10);
+		usleep(500);
 #endif
 	}
 
