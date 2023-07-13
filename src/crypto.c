@@ -31,7 +31,7 @@
 #include "signsky.h"
 
 /* The number of packets in a single run we try to read. */
-#define PACKETS_PER_EVENT		32
+#define PACKETS_PER_EVENT		64
 
 static void	crypto_drop_access(void);
 static void	crypto_recv_packets(int);
@@ -96,7 +96,9 @@ signsky_crypto_entry(struct signsky_proc *proc)
 		while ((pkt = signsky_ring_dequeue(io->crypto)))
 			crypto_send_packet(fd, pkt);
 
+#if !defined(SIGNSKY_HIGH_PERFORMANCE)
 		usleep(10);
+#endif
 	}
 
 	syslog(LOG_NOTICE, "exiting");

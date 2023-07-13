@@ -50,7 +50,12 @@ signsky_packet_get(void)
 	if ((pkt = signsky_pool_get(pktpool)) == NULL)
 		return (NULL);
 
+#if defined(SIGNSKY_HIGH_PERFORMANCE)
+	pkt->length = 0;
+	pkt->target = 0;
+#else
 	signsky_mem_zero(pkt, sizeof(*pkt));
+#endif
 
 	return (pkt);
 }

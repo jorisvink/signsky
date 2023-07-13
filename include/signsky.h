@@ -232,16 +232,19 @@ struct signsky_ipsec_tail {
 
 /*
  * Maximum packet sizes we can receive from the interfaces.
- * Clearly we don't do jumbo frames.
  */
+#if defined(SIGNSKY_HIGH_PERFORMANCE)
+#define SIGNSKY_PACKET_DATA_LEN		9000
+#else
 #define SIGNSKY_PACKET_DATA_LEN		1500
+#endif
 
 /*
  * The total space available in a packet buffer, we're lazy and just
  * made it large enough to hold the head room, packet data and
  * any tail that is going to be added to it.
  */
-#define SIGNSKY_PACKET_MAX_LEN		2048
+#define SIGNSKY_PACKET_MAX_LEN		(SIGNSKY_PACKET_DATA_LEN + 64)
 
 /* The minimum size we can read from an interface. */
 #define SIGNSKY_PACKET_MIN_LEN		12

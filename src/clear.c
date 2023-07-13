@@ -26,7 +26,7 @@
 #include "signsky.h"
 
 /* The number of packets in a single run we try to read. */
-#define PACKETS_PER_EVENT		32
+#define PACKETS_PER_EVENT		64
 
 static void	clear_drop_access(void);
 static void	clear_recv_packets(int);
@@ -87,7 +87,9 @@ signsky_clear_entry(struct signsky_proc *proc)
 		while ((pkt = signsky_ring_dequeue(io->clear)))
 			clear_send_packet(fd, pkt);
 
+#if !defined(SIGNSKY_HIGH_PERFORMANCE)
 		usleep(10);
+#endif
 	}
 
 	close(fd);

@@ -32,6 +32,10 @@ SRC=	src/signsky.c \
 CFLAGS+=-fsanitize=address,undefined
 LDFLAGS+=-fsanitize=address,undefined
 
+ifeq ("$(HPERF)", "1")
+	CFLAGS+=-DSIGNSKY_HIGH_PERFORMANCE=1
+endif
+
 ifeq ("$(CIPHER)", "openssl-aes-gcm")
 	CFLAGS+=$(shell pkg-config openssl --cflags)
 	LDFLAGS+=$(shell pkg-config openssl --libs)

@@ -87,7 +87,9 @@ signsky_decrypt_entry(struct signsky_proc *proc)
 		while ((pkt = signsky_ring_dequeue(io->decrypt)))
 			decrypt_packet_process(pkt);
 
+#if !defined(SIGNSKY_HIGH_PERFORMANCE)
 		usleep(10);
+#endif
 	}
 
 	syslog(LOG_NOTICE, "exiting");
