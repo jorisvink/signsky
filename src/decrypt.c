@@ -130,6 +130,8 @@ decrypt_keys_install(void)
 		}
 	} else {
 		if (signsky_key_install(io->rx, &state.slot_2) != -1) {
+			signsky_atomic_write(&signsky->rx_pending,
+			    state.slot_2.spi);
 			syslog(LOG_NOTICE, "pending RX SA (spi=0x%08x)",
 			    state.slot_2.spi);
 		}
@@ -172,6 +174,8 @@ decrypt_packet_process(struct signsky_packet *pkt)
 	}
 
 	signsky_atomic_write(&signsky->rx.spi, state.slot_2.spi);
+	signsky_atomic_write(&signsky->rx_pending, 0);
+
 	syslog(LOG_NOTICE, "swapping RX SA (spi=0x%08x)", state.slot_2.spi);
 
 	signsky_cipher_cleanup(state.slot_1.cipher);

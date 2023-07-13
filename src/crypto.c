@@ -36,7 +36,7 @@
 static void	crypto_drop_access(void);
 static void	crypto_recv_packets(int);
 static int	crypto_bind_address(void);
-static int	crypto_arwin_check(struct signsky_packet *);
+static int	crypto_packet_check(struct signsky_packet *);
 static void	crypto_send_packet(int, struct signsky_packet *);
 
 /* Temporary packet for when the packet pool is empty. */
@@ -264,7 +264,7 @@ crypto_recv_packets(int fd)
 		pkt->length = ret;
 		pkt->target = SIGNSKY_PROC_DECRYPT;
 
-		if (crypto_arwin_check(pkt) == -1) {
+		if (crypto_packet_check(pkt) == -1) {
 			signsky_packet_release(pkt);
 			continue;
 		}
@@ -276,19 +276,24 @@ crypto_recv_packets(int fd)
 }
 
 /*
- * Perform the initial anti-replay check before we move it forward
- * to our decryption process. We only check if the packet falls
- * inside of the anti-replay window here, the rest is up to
- * the decryption process.
+ * Perform initial sanity check on the incoming packet, this includes
+ * a crude anti-replay check and checking if the SPI is known to the
+ * decryption process.
  *
- * We need to account for the fact that the decryption worker could
- * have up to 1023 queued packets in worst case scenario.
+ * If these checks fail we do not move the packet forward to the
+ * decryption process and instead it will get dropped.
+ *
+ * For the anti-replay check we only check if the packet falls
+ * inside of the anti-replay window here, the rest is up to
+ * the decryption process. We need to account for the fact that
+ * the decryption worker could have up to 1023 queued packets in
+ * worst case scenario.
  */
 static int
-crypto_arwin_check(struct signsky_packet *pkt)
+crypto_packet_check(struct signsky_packet *pkt)
 {
-	u_int32_t			seq;
 	struct signsky_ipsec_hdr	*hdr;
+	u_int32_t			seq, spi;
 	u_int64_t			pn, last;
 
 	PRECOND(pkt != NULL);
@@ -297,8 +302,17 @@ crypto_arwin_check(struct signsky_packet *pkt)
 		return (-1);
 
 	hdr = signsky_packet_head(pkt);
+	spi = be32toh(hdr->esp.spi);
 	seq = be32toh(hdr->esp.seq);
 	pn = be64toh(hdr->pn);
+
+	if (spi == 0)
+		return (-1);
+
+	if (spi != signsky_atomic_read(&signsky->rx.spi)) {
+		if (spi != signsky_atomic_read(&signsky->rx_pending))
+			return (-1);
+	}
 
 	if ((pn & 0xffffffff) != seq)
 		return (-1);

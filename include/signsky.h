@@ -299,6 +299,7 @@ struct signsky_state {
 	/* Tx and Rx statistics. */
 	struct signsky_ifstat	tx;
 	struct signsky_ifstat	rx;
+	u_int32_t		rx_pending;
 };
 
 extern struct signsky_state	*signsky;
