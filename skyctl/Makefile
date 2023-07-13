@@ -1,10 +1,11 @@
 # skyctl Makefile
 
 CC?=cc
-PREFIX?=/usr/local
 OBJDIR?=obj
 BIN=skyctl
+
 DESTDIR?=
+PREFIX?=/usr/local
 INSTALL_DIR=$(PREFIX)/bin
 
 SRC=	../src/skyctl.c

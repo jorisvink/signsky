@@ -2,8 +2,12 @@
 
 CC?=cc
 OBJDIR?=obj
-
 BIN=signsky
+
+DESTDIR?=
+PREFIX?=/usr/local
+INSTALL_DIR=$(PREFIX)/bin
+
 CIPHER?=openssl-aes-gcm
 
 CFLAGS+=-std=c99 -pedantic -Wall -Werror -Wstrict-prototypes
@@ -68,7 +72,9 @@ $(BIN): $(OBJDIR) $(OBJS)
 	$(CC) $(OBJS) $(LDFLAGS) -o $(BIN)
 
 install: $(BIN)
-	install -m 555 $(BIN) /usr/local/bin/$(BIN)
+	mkdir -p $(DESTDIR)$(INSTALL_DIR)
+	install -m 555 $(BIN) $(DESTDIR)$(INSTALL_DIR)/$(BIN)
+	$(MAKE) -C skyctl install
 
 $(OBJDIR):
 	@mkdir -p $(OBJDIR)
